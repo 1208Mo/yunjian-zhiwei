@@ -1,0 +1,32 @@
+{
+    "name": "yunjian-zhiwei",
+    "private": true,
+    "version": "0.2.0",
+    "type": "module",
+    "description": "云间知味 - AI 饮食决策助手",
+    "engines": {
+        "node": "20.x"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
+        "server": "node server/index.js",
+        "dev:all": "concurrently -n web,api -c cyan,magenta \"vite\" \"node server/index.js\""
+    },
+    "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^6.28.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-react": "^4.3.4",
+        "autoprefixer": "^10.4.20",
+        "concurrently": "^9.1.0",
+        "dotenv": "^16.4.7",
+        "express": "^4.21.2",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^3.4.17",
+        "vite": "^5.4.11"
+    }
+}
