@@ -1,59 +1,204 @@
-// 千帆 ERNIE 调用与 prompt 构造的共享逻辑。
+// 大模型调用与 prompt 构造的共享逻辑（百度智能云千帆 ERNIE，OpenAI 兼容接口）。
 // 同时被 Vercel Serverless 函数（api/*.js）和本地 Express 服务（server/index.js）复用。
 import { RECIPES } from "../../src/data/recipes.js";
 
 const QIANFAN_URL = "https://qianfan.baidubce.com/v2/chat/completions";
+// 默认文本模型
+const DEFAULT_MODEL = "ernie-3.5-8k";
+// 默认视觉模型（多模态）
+const DEFAULT_VL_MODEL = "ernie-4.5-turbo-vl-32k";
+
+// 带退避重试的请求：ERNIE 5.1 等新模型对长 prompt 限流较严，
+// 偶发 401(invalid_iam_token)/429 多为瞬时限流，重试即可恢复。
+async function fetchWithRetry(body, { retries = 3, stream = false } = {}) {
+    const apiKey = process.env.QIANFAN_API_KEY;
+    let lastText = "";
+    for (let i = 0; i <= retries; i++) {
+        const res = await fetch(QIANFAN_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+        });
+        if (res.ok && (!stream || res.body)) {
+            return res;
+        }
+        lastText = await res.text().catch(() => "");
+        // 仅对疑似限流的状态重试，其它错误立即抛出
+        const retriable = res.status === 401 || res.status === 429 || res.status >= 500;
+        if (!retriable || i === retries) {
+            throw new Error(`大模型返回 ${res.status}: ${lastText}`);
+        }
+        // 指数退避：0.8s, 1.6s, 3.2s ...
+        await new Promise((r) => setTimeout(r, 800 * 2 ** i));
+    }
+    throw new Error(`大模型请求失败: ${lastText}`);
+}
 
 // 给模型的菜谱清单（精简，作为可选参考池）
 const RECIPE_BRIEF = RECIPES.map(
     (r) => `${r.name}(${r.category}/${r.tags.join("、")})`,
 ).join("，");
 
-// 调用千帆，强制 JSON 输出
+// 不同模型的输出上限不同：ernie-3.5 上限 2048，其它给 4096。
+function maxTokensFor(model) {
+    return /3\.5/.test(model) ? 2048 : 4096;
+}
+
+// 调用大模型，强制 JSON 输出
 export async function callErnie(systemPrompt, userPrompt) {
     const apiKey = process.env.QIANFAN_API_KEY;
-    const model = process.env.QIANFAN_MODEL || "ernie-3.5-8k";
+    const model = process.env.QIANFAN_MODEL || DEFAULT_MODEL;
 
     if (!apiKey) {
         throw new Error("缺少 QIANFAN_API_KEY 环境变量");
     }
 
-    const res = await fetch(QIANFAN_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
+    const res = await fetchWithRetry({
+        model,
+        messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+        ],
+        temperature: 0.8,
+        max_tokens: maxTokensFor(model),
+        response_format: { type: "json_object" },
+    });
+
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || "";
+}
+
+// 流式调用大模型：逐块回调增量文本（onDelta），结束返回完整文本。
+// 用于让前端边生成边展示，缩短「首字」等待感。
+export async function callErnieStream(systemPrompt, userPrompt, onDelta) {
+    const apiKey = process.env.QIANFAN_API_KEY;
+    const model = process.env.QIANFAN_MODEL || DEFAULT_MODEL;
+
+    if (!apiKey) {
+        throw new Error("缺少 QIANFAN_API_KEY 环境变量");
+    }
+
+    const res = await fetchWithRetry(
+        {
             model,
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt },
             ],
             temperature: 0.8,
+            max_tokens: maxTokensFor(model),
             response_format: { type: "json_object" },
-        }),
-    });
+            stream: true,
+        },
+        { stream: true },
+    );
 
-    if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`千帆返回 ${res.status}: ${text}`);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let full = "";
+
+    // 解析 SSE：以「data: {json}」分行，[DONE] 结束
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // 末尾不完整行留到下一轮
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) {
+                continue;
+            }
+            const payload = trimmed.slice(5).trim();
+            if (payload === "[DONE]") {
+                continue;
+            }
+            try {
+                const json = JSON.parse(payload);
+                const delta = json?.choices?.[0]?.delta?.content || "";
+                if (delta) {
+                    full += delta;
+                    onDelta?.(delta);
+                }
+            } catch {
+                // 单行解析失败忽略，继续读后续块
+            }
+        }
     }
+
+    return full;
+}
+// imageDataUrl 形如 "data:image/jpeg;base64,...."。
+export async function callErnieVision(systemPrompt, userText, imageDataUrl) {
+    const apiKey = process.env.QIANFAN_API_KEY;
+    // 视觉模型，单独配置，默认 ernie-4.5-turbo-vl-32k
+    const model = process.env.QIANFAN_VL_MODEL || DEFAULT_VL_MODEL;
+
+    if (!apiKey) {
+        throw new Error("缺少 QIANFAN_API_KEY 环境变量");
+    }
+    if (!imageDataUrl) {
+        throw new Error("缺少图片数据");
+    }
+
+    const res = await fetchWithRetry({
+        model,
+        messages: [
+            { role: "system", content: systemPrompt },
+            {
+                role: "user",
+                content: [
+                    {
+                        type: "image_url",
+                        image_url: { url: imageDataUrl },
+                    },
+                    { type: "text", text: userText },
+                ],
+            },
+        ],
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+    });
 
     const data = await res.json();
     return data?.choices?.[0]?.message?.content || "";
 }
 
-// 从模型返回里安全解析 JSON
+// 从模型返回里安全解析 JSON。
+// 模型偶尔会输出 markdown 围栏或结尾多余逗号，这里做容错清洗后再解析。
 export function parseJsonLoose(text) {
     try {
         return JSON.parse(text);
     } catch {
-        const match = text.match(/\{[\s\S]*\}/);
+        // 1) 去掉 ```json ... ``` 之类的代码围栏
+        let s = text.replace(/```(?:json)?/gi, "");
+        // 2) 抠出最外层的 {...}
+        const match = s.match(/\{[\s\S]*\}/);
         if (match) {
-            return JSON.parse(match[0]);
+            s = match[0];
         }
-        throw new Error("模型未返回合法 JSON");
+        // 3) 清理对象/数组结尾的多余逗号：,} 或 ,]（含中间空白/换行）
+        s = s.replace(/,(\s*[}\]])/g, "$1");
+        // 4) 修复模型偶发漏写 "amount" 字段名：
+        //    {"name":"牛腩",500,"unit":"g"} -> {"name":"牛腩","amount":500,"unit":"g"}
+        s = s.replace(
+            /("name"\s*:\s*"[^"]*"\s*,\s*)(\d+(?:\.\d+)?)(\s*,\s*"unit")/g,
+            '$1"amount":$2$3',
+        );
+        // 5) 删除游离的裸数字元素（前面是逗号、后面紧跟引号键名，说明它没有键）：
+        //    "name":"番茄",2,"amount":300 -> "name":"番茄","amount":300
+        s = s.replace(/,\s*\d+(?:\.\d+)?\s*(,\s*")/g, "$1");
+        try {
+            return JSON.parse(s);
+        } catch {
+            throw new Error("模型未返回合法 JSON");
+        }
     }
 }
 
@@ -66,14 +211,15 @@ export function buildMenuPrompt(body) {
         maxTime = 30,
         tastes = [],
         healthGoals = [],
+        cookware = [],
     } = body || {};
 
     const system = [
         "你是「云间知味」的 AI 营养师兼大厨，为中国年轻人决定每天吃什么。",
         "请基于用户输入生成 1 套搭配均衡的今日菜单（荤素搭配，可含汤/主食）。",
         "必须严格输出 JSON，结构如下：",
-        '{"title":string,"summary":string,"dishes":[{"name":string,"emoji":string,"category":"荤菜|素菜|汤|主食","time":number,"tags":[string],"reason":string,"ingredients":[{"name":string,"amount":number,"unit":string}],"seasoning":[{"name":string,"amount":number,"unit":string}],"steps":[string],"tips":string}]}',
-        "要求：1) 优先使用用户现有食材，特别优先消耗冰箱清仓食材；2) 备料用量要贴合用餐人数；3) reason 说明为什么推荐这道；4) summary 一句话点评整桌搭配。",
+        '{"title":string,"summary":string,"dishes":[{"name":string,"emoji":string,"category":"荤菜|素菜|汤|主食","time":number,"tags":[string],"reason":string,"prep":[string],"ingredients":[{"name":string,"amount":number,"unit":string}],"seasoning":[{"name":string,"amount":number,"unit":string}],"sauce":[{"name":string,"amount":number,"unit":string}],"steps":[string],"tips":string}]}',
+        "要求：1) 优先使用用户现有食材，特别优先消耗冰箱清仓食材；2) 备料用量要贴合用餐人数；3) reason 说明为什么推荐这道；4) summary 一句话点评整桌搭配；5) 若用户限定了现有厨具，只能推荐用这些厨具可完成的菜，绝不推荐需要其它厨具的菜（如无烤箱不推荐烤焗类，无蒸锅不推荐清蒸类）；6) prep 给出每样主料的刀工与预处理（怎么切、是否焯水/腌制/泡水/吸干水分），逐条列出；7) sauce 给出需要预先兑好的碗汁/酱料配比（如糖醋汁、鱼香汁、宫保汁；无需调汁的菜给空数组）；8) steps 要分步详细，每步说清火候和时间，至少 4 步。",
         `可参考的家常菜池（也可发挥）：${RECIPE_BRIEF}`,
     ].join("\n");
 
@@ -84,6 +230,7 @@ export function buildMenuPrompt(body) {
         `单道菜最长耗时：${maxTime} 分钟`,
         `口味偏好：${tastes.join("、") || "不限"}`,
         `健康目标：${healthGoals.join("、") || "无"}`,
+        `现有厨具(仅能用这些，未提供则不限)：${cookware.join("、") || "不限"}`,
     ].join("\n");
 
     return { system, user };
@@ -110,4 +257,41 @@ export function buildFunPrompt(body) {
     }
 
     return { system, user: theme };
+}
+
+// 构造「拍照识别食材」prompt（配合 callErnieVision 使用）
+export function buildVisionPrompt() {
+    const system = [
+        "你是「云间知味」的食材识别助手。用户会上传一张冰箱、菜篮或食材摆放的照片。",
+        "请仔细识别图中所有可食用的食材（蔬菜、肉类、蛋奶、调料、主食等），忽略容器、包装袋、餐具等非食材物品。",
+        "必须严格输出 JSON，结构如下：",
+        '{"ingredients":[{"name":string,"confidence":number}],"note":string}',
+        "要求：1) name 用简洁的中文食材名（如「番茄」「鸡蛋」「五花肉」），不要带数量或修饰；2) confidence 为 0~1 的识别置信度；3) 按置信度从高到低排序；4) 同种食材只列一次；5) note 一句话总结识别情况；6) 若图中没有可识别食材，ingredients 返回空数组。",
+    ].join("\n");
+
+    const user = "请识别这张图片里的所有食材。";
+
+    return { system, user };
+}
+
+// 构造「点菜单」prompt：按早/中/晚三餐各生成若干候选菜，供对方挑选。
+// 候选卡片只需轻量信息（名称/理由/耗时），做法详情由 /api/menu 按需再生成，
+// 这样输出短、不超 token 上限、响应快。
+export function buildPickPrompt(body) {
+    const { tastes = [], note = "" } = body || {};
+
+    const system = [
+        "你是「云间知味」的私人点菜官，要为用户的另一半准备一份「今日吃什么」的候选菜单。",
+        "请按早餐、午餐、晚餐三个餐次，各推荐 3 道家常、易做、适口的菜，让对方从中挑选。",
+        "必须严格输出 JSON，结构如下（保持精简，不要输出做法步骤和食材清单）：",
+        '{"intro":string,"meals":[{"meal":"早餐|午餐|晚餐","emoji":string,"dishes":[{"name":string,"emoji":string,"category":string,"time":number,"tags":[string],"reason":string}]}]}',
+        "要求：1) 早餐清淡快手，午餐有荤有素，晚餐稍丰盛但不油腻；2) reason 用温暖体贴的语气说明为什么推荐给 TA（一句话，15字内）；3) intro 是一句撒糖的开场白；4) 只输出菜名等基本信息，不要写 steps/ingredients。",
+    ].join("\n");
+
+    const user = [
+        `口味偏好：${tastes.join("、") || "不限"}`,
+        `特别说明：${note || "无"}`,
+    ].join("\n");
+
+    return { system, user };
 }

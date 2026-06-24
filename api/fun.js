@@ -1,5 +1,9 @@
-// Vercel Serverless Function: 趣味荐餐（盲盒/星座/五行）
-import { callErnie, parseJsonLoose, buildFunPrompt } from "./_lib/qianfan.js";
+// Vercel Serverless Function: 趣味荐餐（盲盒/星座/五行）SSE 流式输出
+import {
+    callErnieStream,
+    parseJsonLoose,
+    buildFunPrompt,
+} from "./_lib/qianfan.js";
 
 export default async function handler(req, res) {
     if (req.method !== "POST") {
@@ -7,12 +11,24 @@ export default async function handler(req, res) {
         return;
     }
 
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+
+    const send = (event, data) => {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
     try {
         const { system, user } = buildFunPrompt(req.body);
-        const content = await callErnie(system, user);
-        const result = parseJsonLoose(content);
-        res.status(200).json({ source: "ai", result });
+        const full = await callErnieStream(system, user, (delta) => {
+            send("delta", { text: delta });
+        });
+        send("done", { result: parseJsonLoose(full) });
     } catch (err) {
-        res.status(503).json({ error: err.message });
+        send("error", { error: err.message });
+    } finally {
+        res.end();
     }
 }

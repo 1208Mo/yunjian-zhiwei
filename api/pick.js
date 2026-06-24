@@ -1,8 +1,8 @@
-// Vercel Serverless Function: 生成今日菜单（SSE 流式输出）
+// Vercel Serverless Function: 点菜单（早/中/晚三餐候选）SSE 流式输出
 import {
     callErnieStream,
     parseJsonLoose,
-    buildMenuPrompt,
+    buildPickPrompt,
 } from "./_lib/qianfan.js";
 
 export default async function handler(req, res) {
@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     };
 
     try {
-        const { system, user } = buildMenuPrompt(req.body);
+        const { system, user } = buildPickPrompt(req.body);
         const full = await callErnieStream(system, user, (delta) => {
             send("delta", { text: delta });
         });

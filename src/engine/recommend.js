@@ -6,6 +6,67 @@ function ingredientNames(recipe) {
     return recipe.ingredients.map((i) => i.name);
 }
 
+// 可选厨具清单（用于 UI 展示与匹配）
+export const COOKWARE_OPTIONS = [
+    "炒锅",
+    "汤锅",
+    "蒸锅",
+    "煎锅",
+    "烤箱",
+    "高压锅",
+    "电饭煲",
+    "微波炉",
+];
+
+// 各类厨具的「可替代关系」：键为菜谱所需厨具，值为能胜任它的用户厨具。
+// 例如炒锅也能煎、能煮汤；汤锅/高压锅/电饭煲都能煮。
+const COOKWARE_SUBSTITUTES = {
+    炒锅: ["炒锅", "煎锅"],
+    煎锅: ["煎锅", "炒锅"],
+    汤锅: ["汤锅", "炒锅", "高压锅", "电饭煲"],
+    蒸锅: ["蒸锅", "电饭煲", "高压锅"],
+    烤箱: ["烤箱"],
+    电饭煲: ["电饭煲"],
+};
+
+/**
+ * 从菜名与做法步骤推断这道菜需要哪些厨具。
+ * 同时适用于本地菜库与 AI 生成的菜（两者都有 name/steps）。
+ * 返回去重后的所需厨具数组；凉拌等免烹饪菜返回 []。
+ * @param {object} recipe 菜谱
+ * @returns {string[]}
+ */
+export function inferCookware(recipe) {
+    const text = `${recipe.name || ""} ${(recipe.steps || []).join(" ")}`;
+    const needs = new Set();
+
+    if (/蒸/.test(text)) needs.add("蒸锅");
+    if (/烤|焗/.test(text)) needs.add("烤箱");
+    if (/煎|烙/.test(text)) needs.add("煎锅");
+    if (/炒|爆|煸|滑炒|翻炒|回锅/.test(text)) needs.add("炒锅");
+    if (/炖|煮|汤|焯|煲|白灼|烧开|下锅|汆/.test(text)) needs.add("汤锅");
+    if (/焖饭|电饭煲|煮饭|蒸饭/.test(text)) needs.add("电饭煲");
+
+    return [...needs];
+}
+
+/**
+ * 在用户已选厨具下，判断这道菜能否做。
+ * 每一项所需厨具，只要用户拥有其任一可替代厨具即视为满足。
+ * @param {object} recipe 菜谱
+ * @param {string[]} ownedCookware 用户已选厨具
+ * @returns {boolean}
+ */
+export function canCookWith(recipe, ownedCookware) {
+    const needs = inferCookware(recipe);
+    if (!needs.length) return true; // 免烹饪（凉拌等）
+    const owned = new Set(ownedCookware);
+    return needs.every((need) => {
+        const subs = COOKWARE_SUBSTITUTES[need] || [need];
+        return subs.some((s) => owned.has(s));
+    });
+}
+
 /**
  * 为单道菜打分。
  * @param {object} recipe 菜谱
@@ -89,7 +150,13 @@ export function scoreRecipe(recipe, ctx) {
  * @returns {Array<{ r:object, score:number, reasons:string[] }>}
  */
 export function buildMenu(recipes, ctx, serves) {
-    const scored = recipes
+    // 厨具硬性过滤：用户限定了厨具时，剔除做不了的菜
+    const cookware = ctx.cookware || [];
+    const available = cookware.length
+        ? recipes.filter((r) => canCookWith(r, cookware))
+        : recipes;
+
+    const scored = available
         .map((r) => ({ r, ...scoreRecipe(r, ctx) }))
         .sort((a, b) => b.score - a.score);
 

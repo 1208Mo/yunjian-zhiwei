@@ -3,7 +3,8 @@ import { NavLink } from "react-router-dom";
 const TABS = [
     { to: "/", label: "今日菜单", icon: "🍽️", end: true },
     { to: "/fun", label: "趣味荐餐", icon: "🎲" },
-    { to: "/consensus", label: "饭局共识", icon: "🗳️" },
+    { to: "/consensus", label: "TA来挑菜", icon: "💕" },
+    { to: "/favorites", label: "我的收藏", icon: "⭐" },
 ];
 
 export default function BottomNav() {

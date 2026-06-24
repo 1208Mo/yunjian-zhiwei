@@ -1,194 +1,447 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RECIPES } from "../data/recipes.js";
 import { normalizeDish } from "../utils/menu.js";
-import { useSharedMenu } from "../store/sharedMenu.jsx";
-import DishCard from "../components/DishCard.jsx";
+import { streamAiPick, createRoom, fetchRoom } from "../api/client.js";
+import { registerDishes } from "../utils/dishRegistry.js";
+import MenuSkeleton from "../components/MenuSkeleton.jsx";
+import Chip from "../components/Chip.jsx";
+
+const TASTE_OPTIONS = ["家常", "川味", "酸甜", "麻辣", "清淡", "清爽", "浓郁", "鲜"];
+const MEAL_EMOJI = { 早餐: "🌅", 午餐: "🍱", 晚餐: "🌙" };
+const ROOM_KEY = "yjzw.roomCode.v1"; // 固定暗号存本地，下次自动复用
+
+// 本地兜底：按三餐各随机出 3 道菜
+function buildLocalMeals() {
+    const meals = ["早餐", "午餐", "晚餐"];
+    return meals.map((meal) => {
+        const pool = [...RECIPES].sort(() => Math.random() - 0.5).slice(0, 3);
+        return {
+            meal,
+            emoji: MEAL_EMOJI[meal],
+            dishes: pool.map((r) => normalizeDish(r)),
+        };
+    });
+}
 
 export default function Consensus() {
     const navigate = useNavigate();
-    const { setSharedMenu } = useSharedMenu();
 
-    const [people, setPeople] = useState(["我", "TA"]);
-    const [newName, setNewName] = useState("");
-    const [candidates, setCandidates] = useState([]);
-    const [votes, setVotes] = useState({});
-    const [stage, setStage] = useState("setup"); // setup | vote | result
+    const [tastes, setTastes] = useState([]);
+    const [note, setNote] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [intro, setIntro] = useState("");
+    const [meals, setMeals] = useState(null); // [{meal, emoji, dishes:[]}]
+    // 每个餐次选中的菜 id：{ 早餐: id, 午餐: id, 晚餐: id }
+    const [picked, setPicked] = useState({});
 
-    const genCandidates = () => {
-        const pool = [...RECIPES]
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 6);
-        setCandidates(pool);
-        setVotes({});
-        setStage("vote");
+    // 固定暗号分享：本地存一个暗号，菜单生成后自动推送到该房间，
+    // TA 用同一个暗号链接，刷新就能看到最新菜单；TA 的选择轮询同步回来。
+    const [roomCode, setRoomCode] = useState(
+        () => (localStorage.getItem(ROOM_KEY) || "").toUpperCase(),
+    );
+    const [codeInput, setCodeInput] = useState("");
+    const [pushing, setPushing] = useState(false);
+    const [pushed, setPushed] = useState(false); // 当前菜单是否已推给 TA
+    const [shareErr, setShareErr] = useState("");
+    const [copied, setCopied] = useState(false);
+    const pollRef = useRef(null);
+
+    const shareUrl = roomCode
+        ? `${window.location.origin}${window.location.pathname}#/pick/${roomCode}`
+        : "";
+
+    // 设定/修改暗号
+    const saveCode = () => {
+        const c = codeInput.trim().toUpperCase();
+        if (!/^[A-Z0-9]{2,16}$/.test(c)) {
+            setShareErr("暗号只能是 2-16 位字母或数字");
+            return;
+        }
+        setShareErr("");
+        localStorage.setItem(ROOM_KEY, c);
+        setRoomCode(c);
+        setCodeInput("");
+        setPushed(false);
     };
 
-    const vote = (id) => {
-        setVotes((v) => ({ ...v, [id]: (v[id] || 0) + 1 }));
+    const clearCode = () => {
+        localStorage.removeItem(ROOM_KEY);
+        setRoomCode("");
+        setPushed(false);
     };
 
-    const finalize = () => {
-        const ranked = candidates
-            .map((r) => ({ r, v: votes[r.id] || 0 }))
-            .sort((a, b) => b.v - a.v);
-        const top = ranked
-            .slice(0, Math.min(4, candidates.length))
-            .map((x) => normalizeDish({ ...x.r, reason: `${x.v} 票` }));
-
-        // 汇总到共享菜单，跳转到今日菜单页生成开饭卡
-        setSharedMenu({
-            title: "饭局共识菜单",
-            summary: `${people.length} 人投票产生 · 已按得票排序`,
-            dishes: top,
-        });
-        setStage("result");
-    };
-
-    const addPerson = () => {
-        const name = newName.trim();
-        if (name) {
-            setPeople([...people, name]);
-            setNewName("");
+    // 把当前菜单推送到固定房间（覆盖更新，清空旧选择）
+    const pushMenu = async (ms, introText) => {
+        if (!roomCode || !ms) {
+            return;
+        }
+        setPushing(true);
+        setShareErr("");
+        try {
+            await createRoom(
+                { intro: introText, meals: ms },
+                "你的另一半",
+                roomCode,
+            );
+            setPicked({});
+            setPushed(true);
+        } catch (e) {
+            setShareErr(e.message || "推送失败，稍后再试");
+        } finally {
+            setPushing(false);
         }
     };
+
+    // 轮询 TA 的选择（设了暗号就一直轮询，每 4 秒）
+    useEffect(() => {
+        if (!roomCode) {
+            return undefined;
+        }
+        const tick = async () => {
+            try {
+                const room = await fetchRoom(roomCode);
+                setPicked(room.picks || {});
+            } catch {
+                // 房间还没建或偶发失败，忽略
+            }
+        };
+        tick();
+        pollRef.current = setInterval(tick, 4000);
+        return () => clearInterval(pollRef.current);
+    }, [roomCode]);
+
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            setShareErr("复制失败，请手动长按链接复制");
+        }
+    };
+
+    const toggleTaste = (t) => {
+        setTastes((prev) =>
+            prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t],
+        );
+    };
+
+    const normalizeMeals = (raw) =>
+        (raw || []).map((m) => ({
+            meal: m.meal || "一餐",
+            emoji: m.emoji || MEAL_EMOJI[m.meal] || "🍽️",
+            dishes: (m.dishes || []).map((d) => normalizeDish(d)),
+        }));
+
+    const generate = async () => {
+        setLoading(true);
+        setMeals(null);
+        setPicked({});
+        setPushed(false);
+        setShareErr("");
+        try {
+            const { menu } = await streamAiPick({ tastes, note });
+            const ms = normalizeMeals(menu.meals);
+            const introText = menu.intro || "今天想吃点啥，你来挑～";
+            setIntro(introText);
+            setMeals(ms);
+            ms.forEach((m) => registerDishes(m.dishes));
+            // 已设暗号则自动推给 TA，无需手动分享
+            if (roomCode) {
+                pushMenu(ms, introText);
+            }
+        } catch {
+            const ms = buildLocalMeals();
+            const introText = "AI 暂时不在状态，先用本地菜单给你挑～";
+            setIntro(introText);
+            setMeals(ms);
+            ms.forEach((m) => registerDishes(m.dishes));
+            if (roomCode) {
+                pushMenu(ms, introText);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const pick = (meal, id) => {
+        setPicked((prev) => ({
+            ...prev,
+            [meal]: prev[meal] === id ? undefined : id,
+        }));
+    };
+
+    const pickedCount = Object.values(picked).filter(Boolean).length;
 
     return (
         <div className="space-y-5">
             <header className="bg-gradient-to-br from-rose-400 to-pink-600 rounded-3xl p-5 text-white shadow-lg">
-                <h1 className="text-xl font-bold">饭局共识 🗳️</h1>
+                <h1 className="text-xl font-bold">今天吃什么 · 你来挑 💕</h1>
                 <p className="text-sm text-white/85 mt-1">
-                    情侣/室友/家庭，投票选出大家都满意的菜单
+                    我准备好菜单，每顿你选一道喜欢的
                 </p>
             </header>
 
-            {stage === "setup" && (
+            {/* 偏好设置 + 生成 */}
+            {!meals && !loading && (
                 <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
                     <div>
                         <label className="text-sm font-medium text-gray-700">
-                            👨‍👩‍👧 参与的人
+                            😋 TA 的口味偏好
                         </label>
                         <div className="flex flex-wrap gap-2 mt-2">
-                            {people.map((p, i) => (
-                                <span
-                                    key={`${p}-${i}`}
-                                    className="px-3 py-1.5 rounded-full bg-rose-50 text-rose-600 text-sm flex items-center gap-1.5"
+                            {TASTE_OPTIONS.map((t) => (
+                                <Chip
+                                    key={t}
+                                    active={tastes.includes(t)}
+                                    onClick={() => toggleTaste(t)}
                                 >
-                                    {p}
-                                    <button
-                                        onClick={() =>
-                                            setPeople(
-                                                people.filter(
-                                                    (_, j) => j !== i,
-                                                ),
-                                            )
-                                        }
-                                        className="text-rose-300"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
+                                    {t}
+                                </Chip>
                             ))}
                         </div>
-                        <div className="flex gap-2 mt-3">
-                            <input
-                                value={newName}
-                                onChange={(e) => setNewName(e.target.value)}
-                                placeholder="加一个人"
-                                className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-rose-400"
-                            />
-                            <button
-                                onClick={addPerson}
-                                className="px-4 rounded-xl bg-rose-500 text-white text-sm"
-                            >
-                                添加
-                            </button>
-                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">
+                            📝 想对 TA 说 / 特别要求
+                        </label>
+                        <input
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="比如：最近想吃辣的、别太油腻"
+                            className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-rose-400"
+                        />
                     </div>
                     <button
-                        onClick={genCandidates}
+                        onClick={generate}
                         className="w-full py-3 rounded-xl bg-rose-500 text-white font-semibold shadow-md active:scale-[.98] transition"
                     >
-                        🍱 生成候选菜单去投票
+                        🍽️ 生成今日菜单给 TA 挑
                     </button>
                 </div>
             )}
 
-            {stage === "vote" && (
+            {loading && (
                 <div className="space-y-3">
-                    <p className="text-sm text-gray-500 text-center">
-                        大家轮流点心仪的菜（可重复点表示加票）
+                    <p className="text-sm text-rose-500 text-center">
+                        正在用心准备菜单…💗
                     </p>
-                    {candidates.map((r) => (
-                        <button
-                            key={r.id}
-                            onClick={() => vote(r.id)}
-                            className="w-full bg-white rounded-2xl p-4 shadow-sm border border-rose-50 flex items-center gap-3 active:scale-[.99] transition text-left"
-                        >
-                            <div className="text-2xl">{r.emoji}</div>
-                            <div className="flex-1">
-                                <div className="font-semibold text-gray-800">
-                                    {r.name}
-                                </div>
-                                <div className="text-xs text-gray-400">
-                                    {r.category} · {r.tags.join("、")}
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                                <span className="text-rose-500 font-bold text-lg">
-                                    {votes[r.id] || 0}
-                                </span>
-                                <span className="text-rose-300">❤️</span>
-                            </div>
-                        </button>
-                    ))}
-                    <button
-                        onClick={finalize}
-                        className="w-full py-3 rounded-xl bg-rose-500 text-white font-semibold shadow-md active:scale-[.98] transition mt-2"
-                    >
-                        ✅ 投完了，AI 汇总最终菜单
-                    </button>
+                    <MenuSkeleton count={3} />
                 </div>
             )}
 
-            {stage === "result" && (
-                <div className="space-y-3 animate-pop">
-                    <div className="bg-white rounded-2xl p-4 shadow-sm">
-                        <h2 className="font-bold text-gray-800">
-                            🎉 大家的共识菜单
-                        </h2>
-                        <p className="text-sm text-rose-500 mt-1">
-                            已按得票排序，点下方按钮去「今日菜单」生成开饭卡
-                        </p>
+            {!loading && meals && (
+                <div className="space-y-5">
+                    <p className="text-sm text-rose-500 bg-rose-50 rounded-xl px-3 py-2.5">
+                        💌 {intro}
+                    </p>
+
+                    {/* 固定暗号分享：设一次暗号，以后每次生成自动推给 TA，TA 刷新即可看到 */}
+                    <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+                        {!roomCode ? (
+                            <>
+                                <p className="text-sm text-gray-600">
+                                    设一个你俩的专属暗号（比如名字缩写），把链接发 TA 一次。
+                                    以后你换菜单，TA 刷新页面就能看到，不用再发链接 💕
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        value={codeInput}
+                                        onChange={(e) =>
+                                            setCodeInput(e.target.value)
+                                        }
+                                        placeholder="自定义暗号，如 XMTT"
+                                        maxLength={16}
+                                        className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-rose-400"
+                                    />
+                                    <button
+                                        onClick={saveCode}
+                                        className="px-4 rounded-xl bg-rose-500 text-white text-sm whitespace-nowrap"
+                                    >
+                                        设定
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm font-medium text-gray-700">
+                                    暗号{" "}
+                                    <span className="text-rose-500">
+                                        {roomCode}
+                                    </span>
+                                    <span className="text-gray-400 font-normal">
+                                        {pushing
+                                            ? " · 正在推送给 TA…"
+                                            : pushed
+                                              ? " · 已推送，TA 刷新即可看到"
+                                              : " · 这桌菜单还没推给 TA"}
+                                    </span>
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        readOnly
+                                        value={shareUrl}
+                                        className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-gray-200 text-xs text-gray-500 bg-gray-50"
+                                    />
+                                    <button
+                                        onClick={copyLink}
+                                        className="px-4 rounded-xl bg-rose-500 text-white text-sm whitespace-nowrap"
+                                    >
+                                        {copied ? "已复制" : "复制链接"}
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-400">
+                                        链接只需发 TA 一次。TA 把它存浏览器/加桌面，刷新就同步。
+                                    </p>
+                                    <button
+                                        onClick={clearCode}
+                                        className="text-xs text-gray-400 underline whitespace-nowrap ml-2"
+                                    >
+                                        换暗号
+                                    </button>
+                                </div>
+                                {!pushed && !pushing && (
+                                    <button
+                                        onClick={() => pushMenu(meals, intro)}
+                                        className="w-full py-2.5 rounded-xl bg-rose-500 text-white font-medium active:scale-[.98] transition"
+                                    >
+                                        📤 把这桌菜单推给 TA
+                                    </button>
+                                )}
+                            </>
+                        )}
+                        {shareErr && (
+                            <p className="text-xs text-amber-600">{shareErr}</p>
+                        )}
                     </div>
-                    {candidates
-                        .map((r) => ({ r, v: votes[r.id] || 0 }))
-                        .sort((a, b) => b.v - a.v)
-                        .slice(0, 4)
-                        .map((x, i) => (
-                            <DishCard
-                                key={x.r.id}
-                                item={normalizeDish({
-                                    ...x.r,
-                                    reason: `${x.v} 票`,
+
+                    {meals.map((m) => (
+                        <div key={m.meal} className="space-y-2.5">
+                            <div className="flex items-center justify-between">
+                                <h2 className="font-bold text-gray-800">
+                                    {m.emoji} {m.meal}
+                                </h2>
+                                {picked[m.meal] && (
+                                    <span className="text-xs text-rose-500">
+                                        已选 ✓
+                                    </span>
+                                )}
+                            </div>
+                            {m.dishes.map((d) => {
+                                const active = picked[m.meal] === d.id;
+                                return (
+                                    <div
+                                        key={d.id}
+                                        className={
+                                            "rounded-2xl border transition " +
+                                            (active
+                                                ? "border-rose-400 ring-1 ring-rose-300"
+                                                : "border-transparent")
+                                        }
+                                    >
+                                        <div className="bg-white rounded-2xl p-4 shadow-sm">
+                                            <div className="flex items-start gap-3">
+                                                <div className="text-2xl">
+                                                    {d.emoji}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between">
+                                                        <h3 className="font-semibold text-gray-800">
+                                                            {d.name}
+                                                        </h3>
+                                                        <span className="text-xs text-gray-400 shrink-0">
+                                                            ⏱{d.time}分钟
+                                                        </span>
+                                                    </div>
+                                                    {d.reasons.length > 0 && (
+                                                        <p className="text-xs text-rose-500 mt-1">
+                                                            💗 {d.reasons[0]}
+                                                        </p>
+                                                    )}
+                                                    <div className="flex gap-2 mt-2.5">
+                                                        <button
+                                                            onClick={() =>
+                                                                pick(
+                                                                    m.meal,
+                                                                    d.id,
+                                                                )
+                                                            }
+                                                            disabled={Boolean(
+                                                                roomCode,
+                                                            )}
+                                                            className={
+                                                                "flex-1 py-2 rounded-xl text-sm font-medium transition disabled:opacity-50 " +
+                                                                (active
+                                                                    ? "bg-rose-500 text-white"
+                                                                    : "bg-rose-50 text-rose-500")
+                                                            }
+                                                        >
+                                                            {active
+                                                                ? "✓ 就吃这个"
+                                                                : roomCode
+                                                                  ? "等 TA 选"
+                                                                  : "选它"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() =>
+                                                                navigate(
+                                                                    `/dish/${d.id}`,
+                                                                )
+                                                            }
+                                                            className="px-4 py-2 rounded-xl text-sm text-gray-500 bg-gray-50"
+                                                        >
+                                                            做法
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+
+                    {/* 已选小结 */}
+                    {pickedCount > 0 && (
+                        <div className="bg-white rounded-2xl p-4 shadow-sm">
+                            <h3 className="font-semibold text-gray-800 mb-2">
+                                💝 TA 选好了
+                            </h3>
+                            <ul className="space-y-1.5">
+                                {meals.map((m) => {
+                                    const d = m.dishes.find(
+                                        (x) => x.id === picked[m.meal],
+                                    );
+                                    if (!d) {
+                                        return null;
+                                    }
+                                    return (
+                                        <li
+                                            key={m.meal}
+                                            className="text-sm text-gray-600 flex items-center gap-2"
+                                        >
+                                            <span className="text-gray-400">
+                                                {m.emoji} {m.meal}
+                                            </span>
+                                            <span className="font-medium text-gray-800">
+                                                {d.emoji} {d.name}
+                                            </span>
+                                        </li>
+                                    );
                                 })}
-                                delay={i * 60}
-                            />
-                        ))}
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={() => setStage("setup")}
-                            className="py-2.5 rounded-xl bg-white border border-rose-200 text-rose-500 font-medium"
-                        >
-                            再来一局
-                        </button>
-                        <button
-                            onClick={() => navigate("/")}
-                            className="py-2.5 rounded-xl bg-rose-500 text-white font-medium"
-                        >
-                            去生成开饭卡 ›
-                        </button>
-                    </div>
+                            </ul>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={generate}
+                        className="w-full py-3 rounded-xl border border-rose-200 text-rose-500 font-medium active:bg-rose-50"
+                    >
+                        ↺ 换一批菜单
+                    </button>
                 </div>
             )}
         </div>

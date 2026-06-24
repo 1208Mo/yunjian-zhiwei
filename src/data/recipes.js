@@ -4,14 +4,16 @@
 //   name        菜名
 //   emoji       展示图标
 //   baseServes  备料基准人数（amount 按此人数标定，生成时按实际人数缩放）
+//   prep        备菜与刀工 [string]（怎么切、焯水、腌制、预处理）
 //   ingredients 主料备料 [{ name, amount, unit }]
+//   seasoning   调味料 [{ name, amount, unit }]
+//   sauce       碗汁/酱料调配 [{ name, amount, unit }]（需预先兑好的酱汁，无则空）
 //   tags        口味标签
 //   health      健康标签
 //   time        预计耗时（分钟）
 //   category    类别（荤菜 / 素菜 / 汤 / 主食）
 //   element     五行属性（用于趣味荐餐）
 //   steps       分步骤数组
-//   seasoning   调味料 [{ name, amount, unit }]
 //   tips        小贴士
 
 export const RECIPES = [
@@ -20,6 +22,11 @@ export const RECIPES = [
         name: "番茄炒蛋",
         emoji: "🍅",
         baseServes: 2,
+        prep: [
+            "番茄顶部划十字，开水烫30秒撕去皮，切滚刀块。",
+            "鸡蛋打入碗中，加1g盐和10ml清水，顺一个方向打散至起小泡。",
+            "小葱切葱花。",
+        ],
         ingredients: [
             { name: "番茄", amount: 2, unit: "个" },
             { name: "鸡蛋", amount: 3, unit: "个" },
@@ -30,6 +37,7 @@ export const RECIPES = [
             { name: "白糖", amount: 5, unit: "g" },
             { name: "食用油", amount: 20, unit: "ml" },
         ],
+        sauce: [],
         tags: ["家常", "酸甜"],
         health: ["低脂", "高蛋白"],
         time: 10,
@@ -48,6 +56,11 @@ export const RECIPES = [
         name: "青椒土豆丝",
         emoji: "🥔",
         baseServes: 2,
+        prep: [
+            "土豆去皮先切薄片再切细丝，放清水中反复冲洗去淀粉，沥干。",
+            "青椒去籽切细丝。",
+            "大蒜切末。",
+        ],
         ingredients: [
             { name: "土豆", amount: 2, unit: "个" },
             { name: "青椒", amount: 1, unit: "个" },
@@ -58,6 +71,7 @@ export const RECIPES = [
             { name: "生抽", amount: 5, unit: "ml" },
             { name: "食用油", amount: 20, unit: "ml" },
         ],
+        sauce: [],
         tags: ["家常", "清爽"],
         health: ["素食", "低脂"],
         time: 15,
@@ -76,6 +90,11 @@ export const RECIPES = [
         name: "宫保鸡丁",
         emoji: "🐔",
         baseServes: 2,
+        prep: [
+            "鸡胸肉切1.5cm见方的丁，加5ml料酒、5ml生抽、5g淀粉抓匀腌10分钟。",
+            "干辣椒剪段去籽，小葱切葱白小段。",
+            "花生米提前用温油炸至酥脆或干锅焙香，备用。",
+        ],
         ingredients: [
             { name: "鸡胸肉", amount: 300, unit: "g" },
             { name: "花生米", amount: 80, unit: "g" },
@@ -88,6 +107,13 @@ export const RECIPES = [
             { name: "白糖", amount: 10, unit: "g" },
             { name: "料酒", amount: 10, unit: "ml" },
             { name: "淀粉", amount: 10, unit: "g" },
+        ],
+        sauce: [
+            { name: "生抽", amount: 10, unit: "ml" },
+            { name: "陈醋", amount: 15, unit: "ml" },
+            { name: "白糖", amount: 10, unit: "g" },
+            { name: "淀粉", amount: 5, unit: "g" },
+            { name: "清水", amount: 20, unit: "ml" },
         ],
         tags: ["川味", "麻辣", "甜"],
         health: ["高蛋白"],
@@ -107,6 +133,11 @@ export const RECIPES = [
         name: "麻婆豆腐",
         emoji: "🌶️",
         baseServes: 2,
+        prep: [
+            "嫩豆腐切2cm见方的块，放入加了少许盐的温水中浸泡备用（去豆腥、不易碎）。",
+            "豆瓣酱剁细，小葱切葱花。",
+            "淀粉加等量清水调成水淀粉备用。",
+        ],
         ingredients: [
             { name: "嫩豆腐", amount: 1, unit: "盒" },
             { name: "猪肉末", amount: 100, unit: "g" },
@@ -118,6 +149,7 @@ export const RECIPES = [
             { name: "淀粉", amount: 10, unit: "g" },
             { name: "食用油", amount: 25, unit: "ml" },
         ],
+        sauce: [],
         tags: ["川味", "麻辣"],
         health: ["高蛋白"],
         time: 15,
@@ -136,6 +168,11 @@ export const RECIPES = [
         name: "西红柿鸡蛋汤",
         emoji: "🍲",
         baseServes: 3,
+        prep: [
+            "番茄切小块（去皮口感更好）。",
+            "鸡蛋打散备用。",
+            "小葱切葱花，淀粉加水调成水淀粉（喜欢浓稠可选）。",
+        ],
         ingredients: [
             { name: "番茄", amount: 2, unit: "个" },
             { name: "鸡蛋", amount: 2, unit: "个" },
@@ -145,6 +182,7 @@ export const RECIPES = [
             { name: "香油", amount: 5, unit: "ml" },
             { name: "小葱", amount: 1, unit: "根" },
         ],
+        sauce: [],
         tags: ["家常", "清淡"],
         health: ["低脂", "低卡"],
         time: 10,
@@ -163,6 +201,10 @@ export const RECIPES = [
         name: "蒜蓉西兰花",
         emoji: "🥦",
         baseServes: 2,
+        prep: [
+            "西兰花切去硬梗、掰成小朵，放淡盐水中浸泡10分钟后冲净。",
+            "大蒜切末（可分两份，一半爆香、一半起锅前下提香）。",
+        ],
         ingredients: [
             { name: "西兰花", amount: 1, unit: "颗" },
             { name: "大蒜", amount: 4, unit: "瓣" },
@@ -172,6 +214,7 @@ export const RECIPES = [
             { name: "蚝油", amount: 10, unit: "ml" },
             { name: "食用油", amount: 15, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清爽"],
         health: ["素食", "低卡", "高纤维"],
         time: 12,
@@ -190,6 +233,10 @@ export const RECIPES = [
         name: "红烧肉",
         emoji: "🥩",
         baseServes: 4,
+        prep: [
+            "五花肉切成3cm见方的麻将块，冷水下锅加少许料酒焯水去血沫，捞出洗净沥干。",
+            "准备八角、姜片等香料。",
+        ],
         ingredients: [
             { name: "五花肉", amount: 500, unit: "g" },
             { name: "冰糖", amount: 30, unit: "g" },
@@ -200,6 +247,7 @@ export const RECIPES = [
             { name: "料酒", amount: 20, unit: "ml" },
             { name: "八角", amount: 2, unit: "颗" },
         ],
+        sauce: [],
         tags: ["家常", "浓郁", "甜"],
         health: [],
         time: 60,
@@ -218,6 +266,10 @@ export const RECIPES = [
         name: "清蒸鲈鱼",
         emoji: "🐟",
         baseServes: 3,
+        prep: [
+            "鲈鱼去鳞去内脏洗净，鱼身两面斜划两三刀，抹料酒和少许盐腌10分钟去腥。",
+            "姜切片和姜丝，小葱一半切段、一半切细葱丝（葱丝泡冷水更卷）。",
+        ],
         ingredients: [
             { name: "鲈鱼", amount: 1, unit: "条" },
             { name: "姜", amount: 1, unit: "块" },
@@ -228,6 +280,7 @@ export const RECIPES = [
             { name: "料酒", amount: 10, unit: "ml" },
             { name: "食用油", amount: 20, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清淡", "鲜"],
         health: ["高蛋白", "低脂"],
         time: 25,
@@ -246,6 +299,11 @@ export const RECIPES = [
         name: "鱼香肉丝",
         emoji: "🥢",
         baseServes: 2,
+        prep: [
+            "猪里脊切均匀细丝，加5ml料酒、5g淀粉、少许油抓匀腌10分钟。",
+            "木耳泡发切丝，胡萝卜、青椒切丝。",
+            "豆瓣酱剁细，蒜姜切末。",
+        ],
         ingredients: [
             { name: "猪里脊", amount: 250, unit: "g" },
             { name: "木耳", amount: 30, unit: "g" },
@@ -257,6 +315,13 @@ export const RECIPES = [
             { name: "陈醋", amount: 15, unit: "ml" },
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "豆瓣酱", amount: 15, unit: "g" },
+        ],
+        sauce: [
+            { name: "白糖", amount: 15, unit: "g" },
+            { name: "陈醋", amount: 15, unit: "ml" },
+            { name: "生抽", amount: 10, unit: "ml" },
+            { name: "淀粉", amount: 5, unit: "g" },
+            { name: "清水", amount: 20, unit: "ml" },
         ],
         tags: ["川味", "酸甜", "微辣"],
         health: ["高蛋白"],
@@ -276,6 +341,10 @@ export const RECIPES = [
         name: "凉拌黄瓜",
         emoji: "🥒",
         baseServes: 2,
+        prep: [
+            "黄瓜洗净拍裂后切段（拍过更入味），加2g盐腌5分钟杀水。",
+            "大蒜切末。",
+        ],
         ingredients: [
             { name: "黄瓜", amount: 2, unit: "根" },
             { name: "大蒜", amount: 3, unit: "瓣" },
@@ -285,6 +354,13 @@ export const RECIPES = [
             { name: "陈醋", amount: 10, unit: "ml" },
             { name: "辣椒油", amount: 10, unit: "ml" },
             { name: "香油", amount: 5, unit: "ml" },
+        ],
+        sauce: [
+            { name: "生抽", amount: 10, unit: "ml" },
+            { name: "陈醋", amount: 10, unit: "ml" },
+            { name: "辣椒油", amount: 10, unit: "ml" },
+            { name: "香油", amount: 5, unit: "ml" },
+            { name: "白糖", amount: 3, unit: "g" },
         ],
         tags: ["清爽", "酸辣"],
         health: ["素食", "低卡"],
@@ -303,6 +379,10 @@ export const RECIPES = [
         name: "可乐鸡翅",
         emoji: "🍗",
         baseServes: 3,
+        prep: [
+            "鸡翅中洗净，两面各划两刀便于入味，冷水加料酒焯水去血沫后捞出沥干。",
+            "姜切片。",
+        ],
         ingredients: [
             { name: "鸡翅中", amount: 500, unit: "g" },
             { name: "可乐", amount: 330, unit: "ml" },
@@ -312,6 +392,7 @@ export const RECIPES = [
             { name: "料酒", amount: 10, unit: "ml" },
             { name: "姜", amount: 3, unit: "片" },
         ],
+        sauce: [],
         tags: ["家常", "甜"],
         health: ["高蛋白"],
         time: 30,
@@ -330,6 +411,10 @@ export const RECIPES = [
         name: "酸辣土豆丝",
         emoji: "🥔",
         baseServes: 2,
+        prep: [
+            "土豆去皮切细丝，清水反复冲洗去淀粉后沥干。",
+            "干辣椒剪段，备好花椒粒。",
+        ],
         ingredients: [
             { name: "土豆", amount: 2, unit: "个" },
             { name: "干辣椒", amount: 5, unit: "个" },
@@ -340,6 +425,7 @@ export const RECIPES = [
             { name: "花椒", amount: 10, unit: "粒" },
             { name: "食用油", amount: 20, unit: "ml" },
         ],
+        sauce: [],
         tags: ["酸辣"],
         health: ["素食", "低脂"],
         time: 15,
@@ -358,6 +444,10 @@ export const RECIPES = [
         name: "白灼虾",
         emoji: "🦐",
         baseServes: 3,
+        prep: [
+            "基围虾剪去虾须虾枪，用牙签从背部第二节挑出虾线，洗净。",
+            "姜切片和姜末，葱切段。",
+        ],
         ingredients: [
             { name: "基围虾", amount: 400, unit: "g" },
             { name: "姜", amount: 1, unit: "块" },
@@ -365,6 +455,11 @@ export const RECIPES = [
         seasoning: [
             { name: "生抽", amount: 20, unit: "ml" },
             { name: "料酒", amount: 10, unit: "ml" },
+        ],
+        sauce: [
+            { name: "生抽", amount: 20, unit: "ml" },
+            { name: "姜末", amount: 5, unit: "g" },
+            { name: "香油", amount: 3, unit: "ml" },
         ],
         tags: ["清淡", "鲜"],
         health: ["高蛋白", "低脂"],
@@ -384,6 +479,10 @@ export const RECIPES = [
         name: "蛋炒饭",
         emoji: "🍚",
         baseServes: 2,
+        prep: [
+            "隔夜米饭用手或勺子提前打散，避免结块。",
+            "鸡蛋打散，胡萝卜切小丁，小葱切葱花。",
+        ],
         ingredients: [
             { name: "隔夜米饭", amount: 2, unit: "碗" },
             { name: "鸡蛋", amount: 2, unit: "个" },
@@ -395,6 +494,7 @@ export const RECIPES = [
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "食用油", amount: 20, unit: "ml" },
         ],
+        sauce: [],
         tags: ["家常"],
         health: [],
         time: 12,
@@ -413,6 +513,11 @@ export const RECIPES = [
         name: "西红柿牛腩",
         emoji: "🍅",
         baseServes: 4,
+        prep: [
+            "牛腩切3cm见方块，冷水下锅加料酒焯水去血沫，捞出洗净。",
+            "番茄去皮切块（一半切小丁炒汁、一半切大块后放）。",
+            "土豆去皮切滚刀块，姜切片。",
+        ],
         ingredients: [
             { name: "牛腩", amount: 600, unit: "g" },
             { name: "番茄", amount: 3, unit: "个" },
@@ -424,6 +529,7 @@ export const RECIPES = [
             { name: "姜", amount: 3, unit: "片" },
             { name: "盐", amount: 5, unit: "g" },
         ],
+        sauce: [],
         tags: ["浓郁", "酸甜"],
         health: ["高蛋白"],
         time: 70,
@@ -442,6 +548,11 @@ export const RECIPES = [
         name: "蒜蓉粉丝蒸娃娃菜",
         emoji: "🥬",
         baseServes: 3,
+        prep: [
+            "龙口粉丝用温水泡软，沥干铺在盘底。",
+            "娃娃菜竖切成条，码放在粉丝上。",
+            "大蒜剁成蒜末，分两份（一份炒香、一份生用）。",
+        ],
         ingredients: [
             { name: "娃娃菜", amount: 2, unit: "颗" },
             { name: "龙口粉丝", amount: 1, unit: "把" },
@@ -451,6 +562,7 @@ export const RECIPES = [
             { name: "蒸鱼豉油", amount: 20, unit: "ml" },
             { name: "食用油", amount: 25, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清淡", "鲜"],
         health: ["素食", "低卡"],
         time: 18,
@@ -469,6 +581,10 @@ export const RECIPES = [
         name: "回锅肉",
         emoji: "🥓",
         baseServes: 3,
+        prep: [
+            "五花肉整块加姜片、葱段煮至八分熟，放凉后切成薄片。",
+            "青蒜斜切段（蒜白蒜叶分开），豆瓣酱剁细，姜切片。",
+        ],
         ingredients: [
             { name: "五花肉", amount: 400, unit: "g" },
             { name: "青蒜", amount: 3, unit: "根" },
@@ -479,6 +595,7 @@ export const RECIPES = [
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "姜", amount: 3, unit: "片" },
         ],
+        sauce: [],
         tags: ["川味", "浓郁", "微辣"],
         health: [],
         time: 25,
@@ -497,6 +614,10 @@ export const RECIPES = [
         name: "紫菜蛋花汤",
         emoji: "🍲",
         baseServes: 3,
+        prep: [
+            "紫菜撕成小块，虾皮用清水冲洗去咸味和杂质。",
+            "鸡蛋打散，小葱切葱花。",
+        ],
         ingredients: [
             { name: "紫菜", amount: 1, unit: "片" },
             { name: "鸡蛋", amount: 1, unit: "个" },
@@ -507,6 +628,7 @@ export const RECIPES = [
             { name: "香油", amount: 5, unit: "ml" },
             { name: "小葱", amount: 1, unit: "根" },
         ],
+        sauce: [],
         tags: ["清淡", "鲜"],
         health: ["低卡", "低脂"],
         time: 8,
@@ -525,6 +647,10 @@ export const RECIPES = [
         name: "干煸四季豆",
         emoji: "🫛",
         baseServes: 2,
+        prep: [
+            "四季豆撕去两侧老筋，切成5cm长段，用厨房纸彻底擦干水分（防溅油）。",
+            "蒜切末，干辣椒剪段，猪肉末备用。",
+        ],
         ingredients: [
             { name: "四季豆", amount: 300, unit: "g" },
             { name: "猪肉末", amount: 80, unit: "g" },
@@ -534,6 +660,7 @@ export const RECIPES = [
             { name: "大蒜", amount: 3, unit: "瓣" },
             { name: "生抽", amount: 10, unit: "ml" },
         ],
+        sauce: [],
         tags: ["川味", "微辣"],
         health: ["高纤维"],
         time: 20,
@@ -552,6 +679,11 @@ export const RECIPES = [
         name: "皮蛋瘦肉粥",
         emoji: "🥣",
         baseServes: 3,
+        prep: [
+            "大米淘净，加少许油和盐拌匀腌10分钟（更易熬出米油）。",
+            "瘦肉切丝，加少许盐、淀粉抓匀；皮蛋去壳切丁。",
+            "小葱切葱花、姜切丝。",
+        ],
         ingredients: [
             { name: "大米", amount: 150, unit: "g" },
             { name: "皮蛋", amount: 2, unit: "个" },
@@ -562,6 +694,7 @@ export const RECIPES = [
             { name: "白胡椒粉", amount: 2, unit: "g" },
             { name: "香油", amount: 5, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清淡"],
         health: ["低脂", "暖胃"],
         time: 40,
@@ -580,6 +713,10 @@ export const RECIPES = [
         name: "糖醋里脊",
         emoji: "🍖",
         baseServes: 3,
+        prep: [
+            "猪里脊切1cm粗的条，加少许盐、料酒腌10分钟。",
+            "淀粉加水和少许鸡蛋调成能挂住的脆皮糊，里脊裹匀。",
+        ],
         ingredients: [
             { name: "猪里脊", amount: 400, unit: "g" },
             { name: "番茄酱", amount: 40, unit: "g" },
@@ -588,6 +725,12 @@ export const RECIPES = [
             { name: "白醋", amount: 20, unit: "ml" },
             { name: "白糖", amount: 30, unit: "g" },
             { name: "淀粉", amount: 50, unit: "g" },
+        ],
+        sauce: [
+            { name: "番茄酱", amount: 40, unit: "g" },
+            { name: "白糖", amount: 30, unit: "g" },
+            { name: "白醋", amount: 20, unit: "ml" },
+            { name: "清水", amount: 30, unit: "ml" },
         ],
         tags: ["酸甜"],
         health: ["高蛋白"],
@@ -607,6 +750,10 @@ export const RECIPES = [
         name: "蚝油生菜",
         emoji: "🥬",
         baseServes: 2,
+        prep: [
+            "生菜掰开洗净，沥干水分。",
+            "大蒜切末。",
+        ],
         ingredients: [
             { name: "生菜", amount: 1, unit: "颗" },
             { name: "大蒜", amount: 3, unit: "瓣" },
@@ -615,6 +762,12 @@ export const RECIPES = [
             { name: "蚝油", amount: 15, unit: "ml" },
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "食用油", amount: 15, unit: "ml" },
+        ],
+        sauce: [
+            { name: "蚝油", amount: 15, unit: "ml" },
+            { name: "生抽", amount: 10, unit: "ml" },
+            { name: "白糖", amount: 3, unit: "g" },
+            { name: "清水", amount: 20, unit: "ml" },
         ],
         tags: ["清爽"],
         health: ["素食", "低卡"],
@@ -634,6 +787,10 @@ export const RECIPES = [
         name: "香煎豆腐",
         emoji: "🍳",
         baseServes: 2,
+        prep: [
+            "老豆腐切1.5cm厚片，用厨房纸吸干表面水分（防溅油、不易碎）。",
+            "小葱切葱花。",
+        ],
         ingredients: [
             { name: "老豆腐", amount: 1, unit: "块" },
             { name: "小葱", amount: 2, unit: "根" },
@@ -642,6 +799,12 @@ export const RECIPES = [
             { name: "生抽", amount: 15, unit: "ml" },
             { name: "蚝油", amount: 10, unit: "ml" },
             { name: "白糖", amount: 5, unit: "g" },
+        ],
+        sauce: [
+            { name: "生抽", amount: 15, unit: "ml" },
+            { name: "蚝油", amount: 10, unit: "ml" },
+            { name: "白糖", amount: 5, unit: "g" },
+            { name: "清水", amount: 30, unit: "ml" },
         ],
         tags: ["家常", "鲜"],
         health: ["素食", "高蛋白"],
@@ -661,6 +824,10 @@ export const RECIPES = [
         name: "辣子鸡",
         emoji: "🌶️",
         baseServes: 3,
+        prep: [
+            "鸡腿肉去骨切2cm小丁，加4g盐、15ml料酒、15ml生抽腌15分钟。",
+            "干辣椒剪段去籽，备好花椒、蒜片、姜片。",
+        ],
         ingredients: [
             { name: "鸡腿肉", amount: 500, unit: "g" },
             { name: "干辣椒", amount: 30, unit: "个" },
@@ -671,6 +838,7 @@ export const RECIPES = [
             { name: "生抽", amount: 15, unit: "ml" },
             { name: "料酒", amount: 15, unit: "ml" },
         ],
+        sauce: [],
         tags: ["川味", "麻辣"],
         health: ["高蛋白"],
         time: 30,
@@ -689,6 +857,10 @@ export const RECIPES = [
         name: "冬瓜排骨汤",
         emoji: "🍲",
         baseServes: 4,
+        prep: [
+            "排骨剁段，冷水下锅加料酒焯水去血沫，捞出冲净。",
+            "冬瓜去皮去瓤切厚块，姜切片，备好枸杞。",
+        ],
         ingredients: [
             { name: "排骨", amount: 500, unit: "g" },
             { name: "冬瓜", amount: 400, unit: "g" },
@@ -698,6 +870,7 @@ export const RECIPES = [
             { name: "姜", amount: 3, unit: "片" },
             { name: "枸杞", amount: 10, unit: "粒" },
         ],
+        sauce: [],
         tags: ["清淡", "鲜"],
         health: ["低脂", "暖胃"],
         time: 60,
@@ -716,6 +889,10 @@ export const RECIPES = [
         name: "手撕包菜",
         emoji: "🥬",
         baseServes: 2,
+        prep: [
+            "包菜手撕成大片，洗净后充分沥干（带水易出汤）。",
+            "蒜切片，干辣椒剪段。",
+        ],
         ingredients: [
             { name: "包菜", amount: 0.5, unit: "颗" },
             { name: "干辣椒", amount: 4, unit: "个" },
@@ -725,6 +902,7 @@ export const RECIPES = [
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "陈醋", amount: 10, unit: "ml" },
         ],
+        sauce: [],
         tags: ["家常", "微辣"],
         health: ["素食", "低卡"],
         time: 12,
@@ -743,6 +921,10 @@ export const RECIPES = [
         name: "黑椒牛柳",
         emoji: "🥩",
         baseServes: 2,
+        prep: [
+            "牛里脊逆纹切1cm粗条，加10ml生抽、5g淀粉、少许油抓匀腌15分钟。",
+            "洋葱切条，备好现磨黑胡椒。",
+        ],
         ingredients: [
             { name: "牛里脊", amount: 300, unit: "g" },
             { name: "洋葱", amount: 0.5, unit: "个" },
@@ -752,6 +934,13 @@ export const RECIPES = [
             { name: "蚝油", amount: 15, unit: "ml" },
             { name: "生抽", amount: 10, unit: "ml" },
             { name: "白糖", amount: 5, unit: "g" },
+        ],
+        sauce: [
+            { name: "蚝油", amount: 15, unit: "ml" },
+            { name: "生抽", amount: 10, unit: "ml" },
+            { name: "白糖", amount: 5, unit: "g" },
+            { name: "黑胡椒", amount: 5, unit: "g" },
+            { name: "清水", amount: 20, unit: "ml" },
         ],
         tags: ["浓郁"],
         health: ["高蛋白"],
@@ -771,6 +960,10 @@ export const RECIPES = [
         name: "上汤娃娃菜",
         emoji: "🥬",
         baseServes: 3,
+        prep: [
+            "娃娃菜竖切成长条，洗净沥干。",
+            "皮蛋、咸蛋去壳切丁，蒜切末，备好枸杞。",
+        ],
         ingredients: [
             { name: "娃娃菜", amount: 2, unit: "颗" },
             { name: "皮蛋", amount: 1, unit: "个" },
@@ -781,6 +974,7 @@ export const RECIPES = [
             { name: "高汤", amount: 400, unit: "ml" },
             { name: "枸杞", amount: 10, unit: "粒" },
         ],
+        sauce: [],
         tags: ["清淡", "鲜"],
         health: ["低卡"],
         time: 18,
@@ -799,6 +993,10 @@ export const RECIPES = [
         name: "孜然羊肉",
         emoji: "🐑",
         baseServes: 3,
+        prep: [
+            "羊肉切薄片，加10ml料酒、10ml生抽腌10分钟去膻。",
+            "洋葱切丝，备好孜然粒和辣椒粉。",
+        ],
         ingredients: [
             { name: "羊肉", amount: 400, unit: "g" },
             { name: "孜然", amount: 10, unit: "g" },
@@ -809,6 +1007,7 @@ export const RECIPES = [
             { name: "盐", amount: 4, unit: "g" },
             { name: "生抽", amount: 10, unit: "ml" },
         ],
+        sauce: [],
         tags: ["浓郁", "微辣"],
         health: ["高蛋白", "暖身"],
         time: 20,
@@ -827,6 +1026,10 @@ export const RECIPES = [
         name: "西芹炒百合",
         emoji: "🥬",
         baseServes: 2,
+        prep: [
+            "西芹去筋斜切片，胡萝卜切片。",
+            "鲜百合掰成单瓣，去掉褐色边，洗净沥干。",
+        ],
         ingredients: [
             { name: "西芹", amount: 2, unit: "根" },
             { name: "鲜百合", amount: 1, unit: "头" },
@@ -837,6 +1040,7 @@ export const RECIPES = [
             { name: "白糖", amount: 3, unit: "g" },
             { name: "食用油", amount: 15, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清爽"],
         health: ["素食", "低卡", "高纤维"],
         time: 12,
@@ -855,6 +1059,10 @@ export const RECIPES = [
         name: "三杯鸡",
         emoji: "🍗",
         baseServes: 3,
+        prep: [
+            "鸡腿剁成块，冷水加少许料酒焯水去血沫，捞出沥干。",
+            "姜切厚片，九层塔洗净备用。",
+        ],
         ingredients: [
             { name: "鸡腿", amount: 3, unit: "个" },
             { name: "九层塔", amount: 1, unit: "把" },
@@ -864,6 +1072,11 @@ export const RECIPES = [
             { name: "米酒", amount: 50, unit: "ml" },
             { name: "酱油", amount: 50, unit: "ml" },
             { name: "麻油", amount: 50, unit: "ml" },
+            { name: "冰糖", amount: 15, unit: "g" },
+        ],
+        sauce: [
+            { name: "米酒", amount: 50, unit: "ml" },
+            { name: "酱油", amount: 50, unit: "ml" },
             { name: "冰糖", amount: 15, unit: "g" },
         ],
         tags: ["浓郁", "甜"],
@@ -884,6 +1097,10 @@ export const RECIPES = [
         name: "酸菜鱼",
         emoji: "🐟",
         baseServes: 4,
+        prep: [
+            "黑鱼片成薄片，加蛋清、15g淀粉、少许盐抓匀上浆；鱼头鱼骨单独剁块。",
+            "酸菜切段挤干水分，泡椒切碎，蒜切末、姜切片。",
+        ],
         ingredients: [
             { name: "黑鱼", amount: 1, unit: "条" },
             { name: "酸菜", amount: 300, unit: "g" },
@@ -894,6 +1111,7 @@ export const RECIPES = [
             { name: "大蒜", amount: 5, unit: "瓣" },
             { name: "淀粉", amount: 15, unit: "g" },
         ],
+        sauce: [],
         tags: ["川味", "酸辣"],
         health: ["高蛋白"],
         time: 35,
@@ -912,6 +1130,10 @@ export const RECIPES = [
         name: "玉米排骨汤",
         emoji: "🌽",
         baseServes: 4,
+        prep: [
+            "排骨剁段，冷水下锅焯水去血沫，捞出冲净。",
+            "玉米切段，胡萝卜切滚刀块，姜切片。",
+        ],
         ingredients: [
             { name: "排骨", amount: 500, unit: "g" },
             { name: "玉米", amount: 2, unit: "根" },
@@ -921,6 +1143,7 @@ export const RECIPES = [
             { name: "盐", amount: 5, unit: "g" },
             { name: "姜", amount: 3, unit: "片" },
         ],
+        sauce: [],
         tags: ["清淡", "甜"],
         health: ["暖胃"],
         time: 60,
@@ -939,6 +1162,9 @@ export const RECIPES = [
         name: "葱油拌面",
         emoji: "🍜",
         baseServes: 1,
+        prep: [
+            "小葱切段，葱白葱绿分开（葱白先下熬油、葱绿后下）。",
+        ],
         ingredients: [
             { name: "面条", amount: 100, unit: "g" },
             { name: "小葱", amount: 4, unit: "根" },
@@ -948,6 +1174,11 @@ export const RECIPES = [
             { name: "老抽", amount: 5, unit: "ml" },
             { name: "白糖", amount: 5, unit: "g" },
             { name: "食用油", amount: 30, unit: "ml" },
+        ],
+        sauce: [
+            { name: "生抽", amount: 15, unit: "ml" },
+            { name: "老抽", amount: 5, unit: "ml" },
+            { name: "白糖", amount: 5, unit: "g" },
         ],
         tags: ["家常", "鲜"],
         health: [],
@@ -967,6 +1198,10 @@ export const RECIPES = [
         name: "番茄龙利鱼",
         emoji: "🐟",
         baseServes: 2,
+        prep: [
+            "龙利鱼解冻吸干水分，切块，加少许盐、淀粉、料酒腌10分钟。",
+            "番茄去皮切小块，蒜切末。",
+        ],
         ingredients: [
             { name: "龙利鱼", amount: 300, unit: "g" },
             { name: "番茄", amount: 2, unit: "个" },
@@ -976,6 +1211,7 @@ export const RECIPES = [
             { name: "盐", amount: 3, unit: "g" },
             { name: "白糖", amount: 5, unit: "g" },
         ],
+        sauce: [],
         tags: ["酸甜", "清淡"],
         health: ["高蛋白", "低脂"],
         time: 20,
@@ -994,12 +1230,17 @@ export const RECIPES = [
         name: "蒸蛋羹",
         emoji: "🥚",
         baseServes: 2,
+        prep: [
+            "鸡蛋打散，按蛋液与温水1:1.5的比例加入温水，搅匀。",
+            "蛋液过筛去除泡沫，小葱切葱花。",
+        ],
         ingredients: [{ name: "鸡蛋", amount: 3, unit: "个" }],
         seasoning: [
             { name: "盐", amount: 2, unit: "g" },
             { name: "生抽", amount: 5, unit: "ml" },
             { name: "香油", amount: 3, unit: "ml" },
         ],
+        sauce: [],
         tags: ["清淡", "嫩滑"],
         health: ["高蛋白", "低脂", "易消化"],
         time: 15,

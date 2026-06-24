@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { getDish } from "../utils/dishRegistry.js";
+import { useFavorites } from "../store/favorites.jsx";
 
 // 食材/调味料用量表
 function AmountTable({ title, items, accent }) {
@@ -35,6 +36,7 @@ function AmountTable({ title, items, accent }) {
 export default function DishDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const { isFavorite, toggleFavorite } = useFavorites();
     const dish = getDish(id);
 
     if (!dish) {
@@ -57,12 +59,24 @@ export default function DishDetail() {
     return (
         <div className="max-w-md mx-auto min-h-full pb-12">
             {/* 顶部返回 */}
-            <div className="sticky top-0 z-10 bg-[#faf6f1]/95 backdrop-blur px-4 py-3">
+            <div className="sticky top-0 z-10 bg-[#faf6f1]/95 backdrop-blur px-4 py-3 flex items-center justify-between">
                 <button
                     onClick={() => navigate(-1)}
                     className="text-sm text-gray-600 flex items-center gap-1"
                 >
                     ‹ 返回
+                </button>
+                <button
+                    onClick={() => toggleFavorite(dish)}
+                    className={
+                        "flex items-center gap-1 text-sm px-3 py-1.5 rounded-full transition " +
+                        (isFavorite(dish.id)
+                            ? "bg-amber-100 text-amber-600"
+                            : "bg-white text-gray-500 shadow-sm")
+                    }
+                >
+                    <span>{isFavorite(dish.id) ? "★" : "☆"}</span>
+                    {isFavorite(dish.id) ? "已收藏" : "收藏"}
                 </button>
             </div>
 
@@ -94,6 +108,28 @@ export default function DishDetail() {
                     )}
                 </header>
 
+                {/* 备菜与刀工 */}
+                {dish.prep.length > 0 && (
+                    <div className="bg-white rounded-2xl p-4 shadow-sm">
+                        <h3 className="font-semibold text-gray-800 mb-3">
+                            🔪 备菜与刀工
+                        </h3>
+                        <ul className="space-y-2">
+                            {dish.prep.map((p, i) => (
+                                <li
+                                    key={i}
+                                    className="flex gap-2 text-sm text-gray-600 leading-relaxed"
+                                >
+                                    <span className="text-brand shrink-0">
+                                        •
+                                    </span>
+                                    <span>{p}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
                 {/* 备料：食材 + 调味料 分开清晰列出 */}
                 <AmountTable
                     title="🥕 食材备料"
@@ -104,6 +140,11 @@ export default function DishDetail() {
                     title="🧂 调味料"
                     items={dish.seasoning}
                     accent="bg-amber-400"
+                />
+                <AmountTable
+                    title="🥣 酱料 / 碗汁调配"
+                    items={dish.sauce}
+                    accent="bg-rose-400"
                 />
 
                 {/* 分步骤做法 */}

@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { RECIPES } from "../data/recipes.js";
 import { CONSTELLATIONS, ELEMENTS, LUCKY_COLORS } from "../data/fun.js";
 import { buildMenu } from "../engine/recommend.js";
-import { fetchAiFun } from "../api/client.js";
+import { streamAiFun } from "../api/client.js";
 import { normalizeDish } from "../utils/menu.js";
 import { registerDishes } from "../utils/dishRegistry.js";
 import Chip from "../components/Chip.jsx";
+import MenuSkeleton from "../components/MenuSkeleton.jsx";
 import DishCard from "../components/DishCard.jsx";
 
 const MODES = [
@@ -88,7 +89,7 @@ export default function FunPick() {
         setResult(null);
 
         try {
-            const { result: aiResult } = await fetchAiFun(payload);
+            const { result: aiResult } = await streamAiFun(payload);
             setResult({
                 title: aiResult.title,
                 line: aiResult.line,
@@ -183,7 +184,14 @@ export default function FunPick() {
                 </button>
             </div>
 
-            {result && (
+            {/* 生成中：骨架屏占位 */}
+            {loading && (
+                <div id="fun-result">
+                    <MenuSkeleton count={2} />
+                </div>
+            )}
+
+            {!loading && result && (
                 <div id="fun-result" className="space-y-3 animate-pop">
                     <div className="bg-white rounded-2xl p-4 shadow-sm">
                         <h2 className="font-bold text-gray-800">

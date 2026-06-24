@@ -14,8 +14,10 @@ export function normalizeDish(raw) {
         time: r.time || 0,
         tags: r.tags || [],
         health: r.health || [],
+        prep: Array.isArray(r.prep) ? r.prep : r.prep ? [r.prep] : [],
         ingredients: r.ingredients || [],
         seasoning: r.seasoning || [],
+        sauce: r.sauce || [],
         steps: Array.isArray(r.steps) ? r.steps : r.steps ? [r.steps] : [],
         tips: r.tips || "",
         // 推荐理由：优先 AI 的 reason，其次规则引擎的 reasons 数组
