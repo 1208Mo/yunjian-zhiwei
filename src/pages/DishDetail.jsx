@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getDish } from "../utils/dishRegistry.js";
+import { getDish, ensureDishDetail } from "../utils/dishRegistry.js";
+import { dishToText, normalizeDish } from "../utils/menu.js";
+import { fetchDishDetail } from "../api/client.js";
 import { useFavorites } from "../store/favorites.jsx";
 
 // 食材/调味料用量表
@@ -37,7 +40,57 @@ export default function DishDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { isFavorite, toggleFavorite } = useFavorites();
+    const [copied, setCopied] = useState(false);
+    // 本地版本号，详情补全后触发重渲染（dish 存在 registry 里，非 state）
+    const [, forceRender] = useState(0);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState("");
     const dish = getDish(id);
+
+    // 阶段二：若这道菜还没有做法详情（来自菜名清单），按菜名补全。
+    // 用 ensureDishDetail 做请求去重 + 缓存命中，避免重复调用 /api/dish。
+    const needDetail = dish && (!dish.steps || dish.steps.length === 0);
+    useEffect(() => {
+        if (!dish || !needDetail) {
+            return undefined;
+        }
+        let alive = true;
+        setDetailLoading(true);
+        setDetailError("");
+        ensureDishDetail(dish.id, async () => {
+            const { dish: detail } = await fetchDishDetail({
+                name: dish.name,
+                serves: dish.serves || 1,
+                cuisines: dish.cuisines || [],
+                cookware: dish.cookware || [],
+                dislikes: dish.dislikes || [],
+            });
+            // 归一并保留原 id/reasons
+            return {
+                ...normalizeDish({ ...detail, id: dish.id }),
+                reasons: dish.reasons,
+            };
+        })
+            .then(() => {
+                if (alive) {
+                    forceRender((n) => n + 1);
+                }
+            })
+            .catch((e) => {
+                if (alive) {
+                    setDetailError(e.message || "做法加载失败");
+                }
+            })
+            .finally(() => {
+                if (alive) {
+                    setDetailLoading(false);
+                }
+            });
+        return () => {
+            alive = false;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
 
     if (!dish) {
         return (
@@ -66,18 +119,36 @@ export default function DishDetail() {
                 >
                     ‹ 返回
                 </button>
-                <button
-                    onClick={() => toggleFavorite(dish)}
-                    className={
-                        "flex items-center gap-1 text-sm px-3 py-1.5 rounded-full transition " +
-                        (isFavorite(dish.id)
-                            ? "bg-amber-100 text-amber-600"
-                            : "bg-white text-gray-500 shadow-sm")
-                    }
-                >
-                    <span>{isFavorite(dish.id) ? "★" : "☆"}</span>
-                    {isFavorite(dish.id) ? "已收藏" : "收藏"}
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={async () => {
+                            try {
+                                await navigator.clipboard.writeText(
+                                    dishToText(dish),
+                                );
+                                setCopied(true);
+                                setTimeout(() => setCopied(false), 1500);
+                            } catch {
+                                // 忽略
+                            }
+                        }}
+                        className="text-sm px-3 py-1.5 rounded-full bg-white text-gray-500 shadow-sm"
+                    >
+                        {copied ? "已复制" : "复制做法"}
+                    </button>
+                    <button
+                        onClick={() => toggleFavorite(dish)}
+                        className={
+                            "flex items-center gap-1 text-sm px-3 py-1.5 rounded-full transition " +
+                            (isFavorite(dish.id)
+                                ? "bg-amber-100 text-amber-600"
+                                : "bg-white text-gray-500 shadow-sm")
+                        }
+                    >
+                        <span>{isFavorite(dish.id) ? "★" : "☆"}</span>
+                        {isFavorite(dish.id) ? "已收藏" : "收藏"}
+                    </button>
+                </div>
             </div>
 
             <div className="px-4 space-y-4">
@@ -107,6 +178,24 @@ export default function DishDetail() {
                         </p>
                     )}
                 </header>
+
+                {/* 做法详情加载中（阶段二补全） */}
+                {detailLoading && (
+                    <div className="bg-white rounded-2xl p-4 shadow-sm animate-pulse space-y-3">
+                        <div className="h-4 w-28 bg-ink-100 rounded" />
+                        <div className="h-3 w-full bg-ink-100 rounded" />
+                        <div className="h-3 w-5/6 bg-ink-100 rounded" />
+                        <div className="h-3 w-2/3 bg-ink-100 rounded" />
+                        <p className="text-xs text-brand pt-1">
+                            正在生成详细做法…🍳
+                        </p>
+                    </div>
+                )}
+                {detailError && (
+                    <div className="bg-amber-50 rounded-2xl p-4 text-sm text-amber-700">
+                        {detailError}
+                    </div>
+                )}
 
                 {/* 备菜与刀工 */}
                 {dish.prep.length > 0 && (

@@ -46,8 +46,9 @@ export default function DishCard({ item, delay = 0 }) {
 
                     <div className="flex items-center justify-between mt-2">
                         <span className="text-xs text-ink-400">
-                            {item.ingredients.length} 种食材 ·{" "}
-                            {item.steps.length} 步
+                            {item.steps && item.steps.length > 0
+                                ? `${item.ingredients.length} 种食材 · ${item.steps.length} 步`
+                                : "点开自动生成详细做法"}
                         </span>
                         <span className="text-xs text-brand font-medium">
                             查看备料与做法 ›

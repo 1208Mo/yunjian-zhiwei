@@ -1,8 +1,9 @@
-// Vercel Serverless Function: 生成今日菜单（SSE 流式输出）
+// Vercel Serverless Function: 生成今日菜单的「菜名清单」（阶段一，SSE 流式）
+// 只出菜名+emoji+分类+耗时+理由，快速返回；做法详情由 /api/dish 按菜名补全。
 import {
     callErnieStream,
     parseJsonLoose,
-    buildMenuPrompt,
+    buildMenuListPrompt,
 } from "./_lib/qianfan.js";
 
 export default async function handler(req, res) {
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
     };
 
     try {
-        const { system, user } = buildMenuPrompt(req.body);
+        const { system, user } = buildMenuListPrompt(req.body);
         const full = await callErnieStream(system, user, (delta) => {
             send("delta", { text: delta });
         });

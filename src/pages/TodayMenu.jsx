@@ -13,28 +13,32 @@ import MenuResult from "../components/MenuResult.jsx";
 
 const TASTE_OPTIONS = ["家常", "川味", "酸甜", "麻辣", "清淡", "清爽", "浓郁", "鲜"];
 const HEALTH_OPTIONS = ["低脂", "低卡", "高蛋白", "素食", "高纤维", "暖胃"];
-// 菜系（单选，不限=不挑菜系）
+// 菜系（可多选，混搭即融合多菜系；不选=不限。「家常」不属于菜系，归在口味里）
 const CUISINE_OPTIONS = [
-    "粤菜", "川菜", "湘菜", "鲁菜", "苏菜", "浙菜", "闽菜", "徽菜", "东北菜", "西北菜", "家常",
+    "粤菜", "川菜", "湘菜", "鲁菜", "苏菜", "浙菜", "闽菜", "徽菜", "东北菜", "西北菜",
 ];
 
 // 常见食材，按类别分组，点选即可，不必手动输入
 const INGREDIENT_GROUPS = [
     {
-        label: "肉蛋",
-        items: ["猪肉", "鸡肉", "牛肉", "鸡蛋", "排骨", "虾", "鱼", "培根"],
+        label: "肉禽蛋",
+        items: ["猪肉", "五花肉", "排骨", "鸡肉", "鸡腿", "鸡翅", "牛肉", "牛腩", "羊肉", "鸭肉", "鸡蛋", "香肠", "培根", "午餐肉"],
+    },
+    {
+        label: "海鲜河鲜",
+        items: ["虾", "基围虾", "鱼", "三文鱼", "带鱼", "鲈鱼", "螃蟹", "花甲", "蛤蜊", "鱿鱼", "扇贝", "生蚝", "墨鱼", "虾仁"],
     },
     {
         label: "蔬菜",
-        items: ["番茄", "土豆", "青椒", "黄瓜", "茄子", "白菜", "西兰花", "胡萝卜", "生菜", "菠菜", "豆角", "蘑菇"],
+        items: ["番茄", "土豆", "青椒", "黄瓜", "茄子", "白菜", "西兰花", "胡萝卜", "生菜", "菠菜", "豆角", "蘑菇", "金针菇", "莴笋", "芹菜", "韭菜", "娃娃菜", "藕", "山药", "南瓜", "丝瓜", "冬瓜", "秋葵"],
     },
     {
         label: "豆制品/主食",
-        items: ["豆腐", "米饭", "面条", "玉米", "年糕"],
+        items: ["豆腐", "豆皮", "腐竹", "米饭", "面条", "玉米", "年糕", "粉丝", "馒头"],
     },
     {
         label: "常备",
-        items: ["葱", "姜", "蒜", "洋葱"],
+        items: ["葱", "姜", "蒜", "洋葱", "小米辣", "干辣椒", "香菜"],
     },
 ];
 
@@ -60,7 +64,7 @@ export default function TodayMenu() {
     const [serves, setServes] = useState(1);
     const [maxTime, setMaxTime] = useState(30);
     const [tastes, setTastes] = useState([]);
-    const [cuisine, setCuisine] = useState(""); // 菜系，单选，空=不限
+    const [cuisines, setCuisines] = useState([]); // 菜系，可多选
     const [healthGoals, setHealthGoals] = useState([]);
     const [cookware, setCookware] = useState([]);
     const [dislikes, setDislikes] = useState(""); // 忌口，「、」分隔
@@ -99,7 +103,7 @@ export default function TodayMenu() {
     const prefSummary = [
         `${serves}人`,
         `≤${maxTime}分钟`,
-        cuisine,
+        ...cuisines,
         ...tastes,
         ...healthGoals,
         ...cookware,
@@ -145,7 +149,7 @@ export default function TodayMenu() {
             serves,
             maxTime,
             tastes,
-            cuisine,
+            cuisines,
             healthGoals,
             cookware,
             dislikes: splitInput(dislikes),
@@ -155,7 +159,7 @@ export default function TodayMenu() {
             clearout: payload.clearout,
             maxTime,
             tastes,
-            cuisine,
+            cuisines,
             healthGoals,
             cookware,
             dislikes: payload.dislikes,
@@ -459,16 +463,16 @@ export default function TodayMenu() {
                         <label className="text-sm font-medium text-gray-700">
                             🍲 菜系{" "}
                             <span className="text-ink-400 font-normal">
-                                （单选，不选=不限）
+                                （可多选，混搭即融合；不选=不限）
                             </span>
                         </label>
                         <div className="flex flex-wrap gap-2 mt-2">
                             {CUISINE_OPTIONS.map((c) => (
                                 <Chip
                                     key={c}
-                                    active={cuisine === c}
+                                    active={cuisines.includes(c)}
                                     onClick={() =>
-                                        setCuisine(cuisine === c ? "" : c)
+                                        toggle(cuisines, setCuisines, c)
                                     }
                                 >
                                     {c}

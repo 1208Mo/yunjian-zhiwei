@@ -4,10 +4,12 @@
 import express from "express";
 import dotenv from "dotenv";
 import {
+    callErnie,
     callErnieStream,
     callErnieVision,
     parseJsonLoose,
-    buildMenuPrompt,
+    buildMenuListPrompt,
+    buildDishDetailPrompt,
     buildFunPrompt,
     buildVisionPrompt,
     buildPickPrompt,
@@ -49,8 +51,19 @@ async function streamJson(res, system, user, resultKey) {
 }
 
 app.post("/api/menu", async (req, res) => {
-    const { system, user } = buildMenuPrompt(req.body);
+    const { system, user } = buildMenuListPrompt(req.body);
     await streamJson(res, system, user, "menu");
+});
+
+// 阶段二：补全单道菜的做法详情
+app.post("/api/dish", async (req, res) => {
+    try {
+        const { system, user } = buildDishDetailPrompt(req.body);
+        const raw = await callErnie(system, user);
+        res.json({ dish: parseJsonLoose(raw) });
+    } catch (err) {
+        res.status(err.status || 500).json({ error: err.message });
+    }
 });
 
 app.post("/api/fun", async (req, res) => {

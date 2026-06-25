@@ -68,9 +68,18 @@ export function MenuResultProvider({ children }) {
         });
         try {
             const { menu } = await run.aiFn(run.payload);
+            const normalized = run.normalizeMenu(menu);
+            // 给每道菜带上生成上下文，供详情页阶段二按菜名补做法
+            const ctx = {
+                serves: run.serves,
+                cuisines: run.payload?.cuisines || [],
+                cookware: run.payload?.cookware || [],
+                dislikes: run.payload?.dislikes || [],
+            };
+            normalized.dishes = normalized.dishes.map((d) => ({ ...d, ...ctx }));
             setResult({
                 loading: false,
-                menus: [run.normalizeMenu(menu)],
+                menus: [normalized],
                 serves: run.serves,
                 source: "ai",
                 error: "",

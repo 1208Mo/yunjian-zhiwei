@@ -113,6 +113,7 @@ export default function MenuResult({ menu, serves }) {
                 <DishCard key={d.id} item={d} delay={i * 60} />
             ))}
 
+            {shoppingList.length > 0 && (
             <div className="bg-white rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                     <h3 className="font-semibold text-gray-800">
@@ -192,6 +193,7 @@ export default function MenuResult({ menu, serves }) {
                     })}
                 </ul>
             </div>
+            )}
 
             <KaiFanCard menu={menu} serves={serves} />
         </div>

@@ -126,9 +126,14 @@ async function streamSse(path, body, onDelta, timeoutMs = 120000) {
     return result;
 }
 
-// 流式生成今日菜单，返回 { menu }
+// 流式生成今日菜单「菜名清单」，返回 { menu }（含菜名/emoji/分类/耗时/理由，无做法详情）
 export function streamAiMenu(payload, onDelta) {
     return streamSse("/api/menu", payload, onDelta);
+}
+
+// 阶段二：按菜名补全单道菜做法详情，返回 { dish }
+export function fetchDishDetail(body) {
+    return postJson("/api/dish", body);
 }
 
 // 流式趣味荐餐，返回 { result }

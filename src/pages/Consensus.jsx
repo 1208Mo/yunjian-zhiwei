@@ -10,7 +10,7 @@ import Chip from "../components/Chip.jsx";
 
 const TASTE_OPTIONS = ["家常", "川味", "酸甜", "麻辣", "清淡", "清爽", "浓郁", "鲜"];
 const CUISINE_OPTIONS = [
-    "粤菜", "川菜", "湘菜", "鲁菜", "苏菜", "浙菜", "闽菜", "徽菜", "东北菜", "西北菜", "家常",
+    "粤菜", "川菜", "湘菜", "鲁菜", "苏菜", "浙菜", "闽菜", "徽菜", "东北菜", "西北菜",
 ];
 const MEAL_EMOJI = { 早餐: "🌅", 午餐: "🍱", 晚餐: "🌙" };
 const ROOM_KEY = "yjzw.roomCode.v1"; // 固定暗号存本地，下次自动复用
@@ -35,7 +35,7 @@ export default function Consensus() {
     const { loading, intro, meals, startedAt, runPick } = pickStore;
 
     const [tastes, setTastes] = useState([]);
-    const [cuisine, setCuisine] = useState(""); // 菜系，单选，空=不限
+    const [cuisines, setCuisines] = useState([]); // 菜系，可多选
     const [note, setNote] = useState("");
     const [dislikes, setDislikes] = useState(""); // 忌口，「、」分隔
     // 每个餐次选中的菜 id：{ 早餐: id, 午餐: id, 晚餐: id }
@@ -155,7 +155,7 @@ export default function Consensus() {
             aiFn: () =>
                 streamAiPick({
                     tastes,
-                    cuisine,
+                    cuisines,
                     note,
                     dislikes: dislikes
                         .split(/[,，、\s]+/)
@@ -212,16 +212,20 @@ export default function Consensus() {
                         <label className="text-sm font-medium text-gray-700">
                             🍲 菜系{" "}
                             <span className="text-ink-400 font-normal">
-                                （单选，不选=不限）
+                                （可多选，不选=不限）
                             </span>
                         </label>
                         <div className="flex flex-wrap gap-2 mt-2">
                             {CUISINE_OPTIONS.map((c) => (
                                 <Chip
                                     key={c}
-                                    active={cuisine === c}
+                                    active={cuisines.includes(c)}
                                     onClick={() =>
-                                        setCuisine(cuisine === c ? "" : c)
+                                        setCuisines((prev) =>
+                                            prev.includes(c)
+                                                ? prev.filter((x) => x !== c)
+                                                : [...prev, c],
+                                        )
                                     }
                                 >
                                     {c}
