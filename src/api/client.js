@@ -29,8 +29,9 @@ export function fetchAiFun(payload) {
 // 流式请求 SSE 接口。
 // onDelta(text)：每收到一块增量文本回调（用于展示「正在生成」进度）。
 // 返回 done 事件里的数据对象（如 {menu} 或 {result}）。
-// 整体超时 timeoutMs（默认 25s），超时抛出带「超时」字样的错误，由调用方兜底。
-async function streamSse(path, body, onDelta, timeoutMs = 25000) {
+// 整体超时 timeoutMs（默认 120s），超时抛出带「超时」字样的错误，由调用方兜底。
+// 菜单/点菜单输出较长，模型常需 30~80s，故给足时间，避免误超时。
+async function streamSse(path, body, onDelta, timeoutMs = 120000) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     let res;

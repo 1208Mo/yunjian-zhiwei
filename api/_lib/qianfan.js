@@ -210,8 +210,11 @@ export function buildMenuPrompt(body) {
         serves = 2,
         maxTime = 30,
         tastes = [],
+        cuisine = "",
         healthGoals = [],
         cookware = [],
+        dislikes = [],
+        avoid = [],
     } = body || {};
 
     const system = [
@@ -220,20 +223,32 @@ export function buildMenuPrompt(body) {
         "必须严格输出 JSON，结构如下：",
         '{"title":string,"summary":string,"dishes":[{"name":string,"emoji":string,"category":"荤菜|素菜|汤|主食","time":number,"tags":[string],"reason":string,"prep":[string],"ingredients":[{"name":string,"amount":number,"unit":string}],"seasoning":[{"name":string,"amount":number,"unit":string}],"sauce":[{"name":string,"amount":number,"unit":string}],"steps":[string],"tips":string}]}',
         "要求：1) 优先使用用户现有食材，特别优先消耗冰箱清仓食材；2) 备料用量要贴合用餐人数；3) reason 说明为什么推荐这道；4) summary 一句话点评整桌搭配；5) 若用户限定了现有厨具，只能推荐用这些厨具可完成的菜，绝不推荐需要其它厨具的菜（如无烤箱不推荐烤焗类，无蒸锅不推荐清蒸类）；6) prep 给出每样主料的刀工与预处理（怎么切、是否焯水/腌制/泡水/吸干水分），逐条列出；7) sauce 给出需要预先兑好的碗汁/酱料配比（如糖醋汁、鱼香汁、宫保汁；无需调汁的菜给空数组）；8) steps 要分步详细，每步说清火候和时间，至少 4 步。",
+        "9) 忌口是硬性要求：用户列出的忌口食材绝对不能出现在任何菜的食材或菜名中，连作为配料、点缀、汤底都不行。哪怕用户在「现有食材」里填了忌口食材，也要忽略它、不用它。",
+        "10) 若指定了菜系（如粤菜/川菜/湘菜等），整桌菜都要是该菜系的代表性或典型做法，体现其招牌手法与口味（如粤菜重清鲜本味、多蒸炒煲；川菜重麻辣鲜香；湘菜重香辣等），不要混入其它菜系。",
         `可参考的家常菜池（也可发挥）：${RECIPE_BRIEF}`,
     ].join("\n");
 
-    const user = [
+    // 忌口食材：从现有食材里剔除，避免自相矛盾
+    const usableIngredients = ingredients.filter((i) => !dislikes.includes(i));
+
+    const userLines = [
         `用餐人数：${serves} 人`,
-        `现有食材：${ingredients.join("、") || "未提供"}`,
+        `现有食材：${usableIngredients.join("、") || "未提供"}`,
         `冰箱清仓(快过期，优先用)：${clearout.join("、") || "无"}`,
         `单道菜最长耗时：${maxTime} 分钟`,
+        `菜系要求(整桌都要符合该菜系的手法与口味，未指定则家常即可)：${cuisine || "不限"}`,
         `口味偏好：${tastes.join("、") || "不限"}`,
         `健康目标：${healthGoals.join("、") || "无"}`,
         `现有厨具(仅能用这些，未提供则不限)：${cookware.join("、") || "不限"}`,
-    ].join("\n");
+        `【忌口/不吃，绝对禁止出现】：${dislikes.join("、") || "无"}`,
+    ];
+    if (avoid.length) {
+        userLines.push(
+            `这些菜上次已经推荐过，请换成不同的菜，不要重复：${avoid.join("、")}`,
+        );
+    }
 
-    return { system, user };
+    return { system, user: userLines.join("\n") };
 }
 
 // 构造「趣味荐餐」prompt
@@ -245,6 +260,8 @@ export function buildFunPrompt(body) {
         "必须严格输出 JSON：",
         '{"title":string,"line":string,"dishes":[{"name":string,"emoji":string,"category":string,"time":number,"tags":[string],"reason":string,"ingredients":[{"name":string,"amount":number,"unit":string}],"seasoning":[{"name":string,"amount":number,"unit":string}],"steps":[string],"tips":string}]}',
         "line 要结合主题写一句有记忆点的开场白。",
+        "搭配必须合理，是能凑成一顿正经饭的两道菜：通常是「一道下饭的硬菜 + 一道配菜/青菜」，或「一荤一素」。绝对不要同时给两道汤水/流食（如粥+汤、汤+羹），也不要两道都是主食或两道都是甜品。category 要如实标注（荤菜/素菜/汤/主食），且两道菜的 category 不应重复成两份汤或两份主食。",
+        "食材要丰富多样、不要老用同一种：荤菜的蛋白来源要在 鸡、鸭、鹅、乳鸽、牛肉、猪肉、羊肉、虾、蛋、豆制品 等之间灵活变换；不要总是推荐鱼，更不允许两道菜都用鱼或同一种主料。每次推荐尽量换不同的食材，给人新鲜感。",
     ].join("\n");
 
     let theme;
@@ -278,18 +295,21 @@ export function buildVisionPrompt() {
 // 候选卡片只需轻量信息（名称/理由/耗时），做法详情由 /api/menu 按需再生成，
 // 这样输出短、不超 token 上限、响应快。
 export function buildPickPrompt(body) {
-    const { tastes = [], note = "" } = body || {};
+    const { tastes = [], note = "", dislikes = [], cuisine = "" } = body || {};
 
     const system = [
         "你是「云间知味」的私人点菜官，要为用户的另一半准备一份「今日吃什么」的候选菜单。",
         "请按早餐、午餐、晚餐三个餐次，各推荐 3 道家常、易做、适口的菜，让对方从中挑选。",
+        "餐次要符合中国人的饮食习惯：早餐是早餐该吃的东西——肠粉、云吞面、生煎、煎饺、包子、粥、豆浆油条、三明治、鸡蛋饼、热干面、小笼包、馄饨等，绝对不要把午晚餐的炒菜（如番茄炒蛋、宫保鸡丁这类下饭炒菜）当早餐；午餐有荤有素能配米饭；晚餐稍丰盛但不油腻。",
         "必须严格输出 JSON，结构如下（保持精简，不要输出做法步骤和食材清单）：",
         '{"intro":string,"meals":[{"meal":"早餐|午餐|晚餐","emoji":string,"dishes":[{"name":string,"emoji":string,"category":string,"time":number,"tags":[string],"reason":string}]}]}',
-        "要求：1) 早餐清淡快手，午餐有荤有素，晚餐稍丰盛但不油腻；2) reason 用温暖体贴的语气说明为什么推荐给 TA（一句话，15字内）；3) intro 是一句撒糖的开场白；4) 只输出菜名等基本信息，不要写 steps/ingredients。",
+        "要求：1) 早餐是真正的早餐食物（见上），午餐有荤有素，晚餐稍丰盛但不油腻；2) reason 用温暖体贴的语气说明为什么推荐给 TA（一句话，15字内）；3) intro 是一句撒糖的开场白；4) 只输出菜名等基本信息，不要写 steps/ingredients；5) 忌口食材绝对不能出现在任何菜里；6) 若指定了菜系，三餐都尽量贴合该菜系的特色（如粤菜早餐可肠粉/艇仔粥，川菜可担担面等），体现地方风味。",
     ].join("\n");
 
     const user = [
         `口味偏好：${tastes.join("、") || "不限"}`,
+        `菜系要求(尽量贴合该地方风味，未指定则不限)：${cuisine || "不限"}`,
+        `【忌口/不吃，绝对禁止出现】：${dislikes.join("、") || "无"}`,
         `特别说明：${note || "无"}`,
     ].join("\n");
 

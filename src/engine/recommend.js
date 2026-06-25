@@ -152,9 +152,22 @@ export function scoreRecipe(recipe, ctx) {
 export function buildMenu(recipes, ctx, serves) {
     // 厨具硬性过滤：用户限定了厨具时，剔除做不了的菜
     const cookware = ctx.cookware || [];
-    const available = cookware.length
+    let available = cookware.length
         ? recipes.filter((r) => canCookWith(r, cookware))
         : recipes;
+
+    // 忌口硬性过滤：菜名或食材命中忌口词则剔除
+    const dislikes = (ctx.dislikes || []).map((s) => s.trim()).filter(Boolean);
+    if (dislikes.length) {
+        available = available.filter((r) => {
+            const names = ingredientNames(r);
+            return !dislikes.some(
+                (d) =>
+                    r.name.includes(d) ||
+                    names.some((ing) => ing.includes(d) || d.includes(ing)),
+            );
+        });
+    }
 
     const scored = available
         .map((r) => ({ r, ...scoreRecipe(r, ctx) }))

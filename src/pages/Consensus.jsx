@@ -4,10 +4,14 @@ import { RECIPES } from "../data/recipes.js";
 import { normalizeDish } from "../utils/menu.js";
 import { streamAiPick, createRoom, fetchRoom } from "../api/client.js";
 import { registerDishes } from "../utils/dishRegistry.js";
-import MenuSkeleton from "../components/MenuSkeleton.jsx";
+import { usePickResult } from "../store/pickResult.jsx";
+import ProgressLoader from "../components/ProgressLoader.jsx";
 import Chip from "../components/Chip.jsx";
 
 const TASTE_OPTIONS = ["家常", "川味", "酸甜", "麻辣", "清淡", "清爽", "浓郁", "鲜"];
+const CUISINE_OPTIONS = [
+    "粤菜", "川菜", "湘菜", "鲁菜", "苏菜", "浙菜", "闽菜", "徽菜", "东北菜", "西北菜", "家常",
+];
 const MEAL_EMOJI = { 早餐: "🌅", 午餐: "🍱", 晚餐: "🌙" };
 const ROOM_KEY = "yjzw.roomCode.v1"; // 固定暗号存本地，下次自动复用
 
@@ -26,12 +30,14 @@ function buildLocalMeals() {
 
 export default function Consensus() {
     const navigate = useNavigate();
+    const pickStore = usePickResult();
+    // 生成态与结果全部来自全局 Provider，切 Tab 不中断
+    const { loading, intro, meals, startedAt, runPick } = pickStore;
 
     const [tastes, setTastes] = useState([]);
+    const [cuisine, setCuisine] = useState(""); // 菜系，单选，空=不限
     const [note, setNote] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [intro, setIntro] = useState("");
-    const [meals, setMeals] = useState(null); // [{meal, emoji, dishes:[]}]
+    const [dislikes, setDislikes] = useState(""); // 忌口，「、」分隔
     // 每个餐次选中的菜 id：{ 早餐: id, 午餐: id, 晚餐: id }
     const [picked, setPicked] = useState({});
 
@@ -111,6 +117,11 @@ export default function Consensus() {
         return () => clearInterval(pollRef.current);
     }, [roomCode]);
 
+    // 菜单生成后登记菜品，供详情页按 id 取用
+    useEffect(() => {
+        (meals || []).forEach((m) => registerDishes(m.dishes));
+    }, [meals]);
+
     const copyLink = async () => {
         try {
             await navigator.clipboard.writeText(shareUrl);
@@ -135,34 +146,29 @@ export default function Consensus() {
         }));
 
     const generate = async () => {
-        setLoading(true);
-        setMeals(null);
         setPicked({});
         setPushed(false);
         setShareErr("");
-        try {
-            const { menu } = await streamAiPick({ tastes, note });
-            const ms = normalizeMeals(menu.meals);
-            const introText = menu.intro || "今天想吃点啥，你来挑～";
-            setIntro(introText);
-            setMeals(ms);
-            ms.forEach((m) => registerDishes(m.dishes));
-            // 已设暗号则自动推给 TA，无需手动分享
-            if (roomCode) {
-                pushMenu(ms, introText);
-            }
-        } catch {
-            const ms = buildLocalMeals();
-            const introText = "AI 暂时不在状态，先用本地菜单给你挑～";
-            setIntro(introText);
-            setMeals(ms);
-            ms.forEach((m) => registerDishes(m.dishes));
-            if (roomCode) {
-                pushMenu(ms, introText);
-            }
-        } finally {
-            setLoading(false);
-        }
+        // 生成放到全局 store 执行；完成后若设了暗号自动推给 TA。
+        // 切换 Tab 不会中断这次生成。
+        runPick({
+            aiFn: () =>
+                streamAiPick({
+                    tastes,
+                    cuisine,
+                    note,
+                    dislikes: dislikes
+                        .split(/[,，、\s]+/)
+                        .filter(Boolean),
+                }),
+            normalizeMeals,
+            buildLocal: buildLocalMeals,
+            onDone: (ms, introText) => {
+                if (roomCode) {
+                    pushMenu(ms, introText);
+                }
+            },
+        });
     };
 
     const pick = (meal, id) => {
@@ -204,6 +210,60 @@ export default function Consensus() {
                     </div>
                     <div>
                         <label className="text-sm font-medium text-gray-700">
+                            🍲 菜系{" "}
+                            <span className="text-ink-400 font-normal">
+                                （单选，不选=不限）
+                            </span>
+                        </label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {CUISINE_OPTIONS.map((c) => (
+                                <Chip
+                                    key={c}
+                                    active={cuisine === c}
+                                    onClick={() =>
+                                        setCuisine(cuisine === c ? "" : c)
+                                    }
+                                >
+                                    {c}
+                                </Chip>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">
+                            🚫 TA 的忌口
+                        </label>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {["鱼", "虾", "香菜", "葱", "蒜", "内脏", "辣椒", "羊肉"].map(
+                                (t) => {
+                                    const list = dislikes
+                                        .split(/[,，、\s]+/)
+                                        .filter(Boolean);
+                                    const on = list.includes(t);
+                                    return (
+                                        <Chip
+                                            key={t}
+                                            active={on}
+                                            onClick={() =>
+                                                setDislikes(
+                                                    (on
+                                                        ? list.filter(
+                                                              (x) => x !== t,
+                                                          )
+                                                        : [...list, t]
+                                                    ).join("、"),
+                                                )
+                                            }
+                                        >
+                                            {t}
+                                        </Chip>
+                                    );
+                                },
+                            )}
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700">
                             📝 想对 TA 说 / 特别要求
                         </label>
                         <input
@@ -227,7 +287,7 @@ export default function Consensus() {
                     <p className="text-sm text-rose-500 text-center">
                         正在用心准备菜单…💗
                     </p>
-                    <MenuSkeleton count={3} />
+                    <ProgressLoader accent="rose" startedAt={startedAt} />
                 </div>
             )}
 

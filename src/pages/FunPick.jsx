@@ -5,8 +5,9 @@ import { buildMenu } from "../engine/recommend.js";
 import { streamAiFun } from "../api/client.js";
 import { normalizeDish } from "../utils/menu.js";
 import { registerDishes } from "../utils/dishRegistry.js";
+import { useFunResult } from "../store/funResult.jsx";
 import Chip from "../components/Chip.jsx";
-import MenuSkeleton from "../components/MenuSkeleton.jsx";
+import ProgressLoader from "../components/ProgressLoader.jsx";
 import DishCard from "../components/DishCard.jsx";
 
 const MODES = [
@@ -27,9 +28,8 @@ export default function FunPick() {
     const [mode, setMode] = useState("blindbox");
     const [constellation, setConstellation] = useState("白羊座");
     const [element, setElement] = useState("火");
-    const [result, setResult] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [source, setSource] = useState(null);
+    // 生成态与结果来自全局 Provider，切 Tab 不中断
+    const { loading, result, startedAt, runFun } = useFunResult();
 
     // 登记结果菜品，供详情页取用
     useEffect(() => {
@@ -74,7 +74,7 @@ export default function FunPick() {
         };
     };
 
-    const run = async () => {
+    const run = () => {
         const payload = {
             mode,
             constellation,
@@ -85,28 +85,16 @@ export default function FunPick() {
                 ],
         };
 
-        setLoading(true);
-        setResult(null);
-
-        try {
-            const { result: aiResult } = await streamAiFun(payload);
-            setResult({
+        // 生成放到全局 store 执行，切换 Tab 不会中断这次生成
+        runFun({
+            aiFn: () => streamAiFun(payload),
+            normalize: (aiResult) => ({
                 title: aiResult.title,
                 line: aiResult.line,
                 dishes: (aiResult.dishes || []).map(normalizeDish),
-            });
-            setSource("ai");
-        } catch {
-            setResult(buildLocalResult());
-            setSource("local");
-        } finally {
-            setLoading(false);
-            setTimeout(() => {
-                document
-                    .getElementById("fun-result")
-                    ?.scrollIntoView({ behavior: "smooth" });
-            }, 80);
-        }
+            }),
+            buildLocal: buildLocalResult,
+        });
     };
 
     const buttonLabel = loading
@@ -119,10 +107,12 @@ export default function FunPick() {
 
     return (
         <div className="space-y-5">
-            <header className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-3xl p-5 text-white shadow-lg">
-                <h1 className="text-xl font-bold">今天靠点小运气 🎲</h1>
-                <p className="text-sm text-white/85 mt-1">
-                    心情、星座、五行…让开饭多点记忆点
+            <header className="pt-1 pb-1">
+                <h1 className="text-2xl font-bold text-ink-800 tracking-tight">
+                    今天靠点小运气
+                </h1>
+                <p className="text-sm text-ink-400 mt-1">
+                    心情、星座、五行，让开饭多点记忆点
                 </p>
             </header>
 
@@ -130,15 +120,12 @@ export default function FunPick() {
                 {MODES.map((m) => (
                     <button
                         key={m.key}
-                        onClick={() => {
-                            setMode(m.key);
-                            setResult(null);
-                        }}
+                        onClick={() => setMode(m.key)}
                         className={
                             "flex-1 py-2.5 rounded-xl text-sm font-medium transition " +
                             (mode === m.key
-                                ? "bg-indigo-500 text-white shadow"
-                                : "bg-white text-gray-500 border border-gray-200")
+                                ? "bg-brand text-white"
+                                : "bg-white text-ink-500 border border-ink-200")
                         }
                     >
                         {m.label}
@@ -146,7 +133,7 @@ export default function FunPick() {
                 ))}
             </div>
 
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="bg-white rounded-2xl p-4 border border-ink-100">
                 {mode === "constellation" && (
                     <div className="flex flex-wrap gap-2 mb-4">
                         {Object.keys(CONSTELLATIONS).map((c) => (
@@ -178,33 +165,32 @@ export default function FunPick() {
                 <button
                     onClick={run}
                     disabled={loading}
-                    className="w-full py-3 rounded-xl bg-indigo-500 text-white font-semibold shadow-md active:scale-[.98] transition disabled:opacity-60"
+                    className="w-full py-3 rounded-xl bg-brand text-white font-semibold active:scale-[.98] transition disabled:opacity-60"
                 >
                     {buttonLabel}
                 </button>
             </div>
 
-            {/* 生成中：骨架屏占位 */}
+            {/* 生成中：进度条占位 */}
             {loading && (
                 <div id="fun-result">
-                    <MenuSkeleton count={2} />
+                    <ProgressLoader
+                        accent="brand"
+                        estimateMs={25000}
+                        startedAt={startedAt}
+                    />
                 </div>
             )}
 
             {!loading && result && (
                 <div id="fun-result" className="space-y-3 animate-pop">
-                    <div className="bg-white rounded-2xl p-4 shadow-sm">
-                        <h2 className="font-bold text-gray-800">
+                    <div className="bg-white rounded-2xl p-4 border border-ink-100">
+                        <h2 className="font-bold text-ink-800">
                             {result.title}
                         </h2>
-                        <p className="text-sm text-indigo-500 mt-1">
+                        <p className="text-sm text-brand mt-1">
                             {result.line}
                         </p>
-                        {source === "local" && (
-                            <p className="text-xs text-amber-600 mt-2">
-                                ⚠️ AI 暂不可用，已用本地推荐兜底
-                            </p>
-                        )}
                     </div>
                     {result.dishes.map((d, i) => (
                         <DishCard key={d.id} item={d} delay={i * 60} />

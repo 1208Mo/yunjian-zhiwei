@@ -12,6 +12,7 @@ const EMPTY = {
     serves: 1,
     source: null, // "ai" | "local"
     error: "", // 生成失败时的提示
+    startedAt: 0, // 本次生成开始时间戳，供进度条按真实经过时间计算
 };
 
 function loadPersisted() {
@@ -53,7 +54,8 @@ export function MenuResultProvider({ children }) {
     }, [result]);
 
     // 执行一次生成。
-    // run = { serves, aiFn:()=>Promise<{menu}>, buildLocal:()=>menus[] }
+    // run = { serves, payload, normalizeMenu, aiFn:(payload)=>Promise<{menu}>, buildLocal:()=>menus[] }
+    // payload 为生成入参（含 ingredients/tastes 等），换一换时复用并追加 avoid。
     const runGenerate = async (run) => {
         lastRunRef.current = run;
         setResult({
@@ -62,9 +64,10 @@ export function MenuResultProvider({ children }) {
             serves: run.serves,
             source: null,
             error: "",
+            startedAt: Date.now(),
         });
         try {
-            const { menu } = await run.aiFn();
+            const { menu } = await run.aiFn(run.payload);
             setResult({
                 loading: false,
                 menus: [run.normalizeMenu(menu)],
@@ -73,8 +76,7 @@ export function MenuResultProvider({ children }) {
                 error: "",
             });
         } catch (e) {
-            const isTimeout = e?.name === "AbortError" || /超时/.test(e?.message || "");
-            // 本地兜底永远能出结果，但保留错误提示让用户知道 AI 没成功
+            // 失败时静默回落到本地推荐，不向用户展示「兜底/AI 不可用」之类提示
             try {
                 const menus = run.buildLocal();
                 setResult({
@@ -82,9 +84,7 @@ export function MenuResultProvider({ children }) {
                     menus,
                     serves: run.serves,
                     source: "local",
-                    error: isTimeout
-                        ? "AI 响应超时，先用本地推荐为你兜底"
-                        : "AI 服务暂不可用，先用本地推荐为你兜底",
+                    error: "",
                 });
             } catch {
                 setResult({
@@ -104,9 +104,33 @@ export function MenuResultProvider({ children }) {
         }
     };
 
+    // 换一换：复用上次入参，把当前已展示的菜名加进 avoid，避免重复出同样的菜。
+    const regenerate = () => {
+        const run = lastRunRef.current;
+        if (!run) {
+            return;
+        }
+        const prevNames = (result.menus || [])
+            .flatMap((m) => (m.dishes || []).map((d) => d.name))
+            .filter(Boolean);
+        const prevAvoid = run.payload?.avoid || [];
+        const avoid = [...new Set([...prevAvoid, ...prevNames])];
+        runGenerate({
+            ...run,
+            payload: { ...run.payload, avoid },
+        });
+    };
+
     return (
         <MenuResultContext.Provider
-            value={{ result, setResult, runGenerate, retry, canRetry: !!lastRunRef.current }}
+            value={{
+                result,
+                setResult,
+                runGenerate,
+                retry,
+                regenerate,
+                canRetry: !!lastRunRef.current,
+            }}
         >
             {children}
         </MenuResultContext.Provider>

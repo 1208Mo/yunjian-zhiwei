@@ -9,9 +9,11 @@ export default function Favorites() {
 
     return (
         <div className="space-y-5">
-            <header className="bg-gradient-to-br from-emerald-400 to-teal-600 rounded-3xl p-5 text-white shadow-lg">
-                <h1 className="text-xl font-bold">我的收藏 ⭐</h1>
-                <p className="text-sm text-white/85 mt-1">
+            <header className="pt-1 pb-1">
+                <h1 className="text-2xl font-bold text-ink-800 tracking-tight">
+                    我的收藏
+                </h1>
+                <p className="text-sm text-ink-400 mt-1">
                     {favorites.length > 0
                         ? `已收藏 ${favorites.length} 道菜，随时翻出来照着做`
                         : "把喜欢的菜谱收藏起来，方便随时查看"}
