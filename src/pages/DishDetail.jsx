@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getDish, ensureDishDetail } from "../utils/dishRegistry.js";
 import { dishToText, normalizeDish } from "../utils/menu.js";
+import { copyText } from "../utils/clipboard.js";
 import { fetchDishDetail } from "../api/client.js";
 import { useFavorites } from "../store/favorites.jsx";
+import { useToast } from "../store/toast.jsx";
 
 // 食材/调味料用量表
 function AmountTable({ title, items, accent }) {
@@ -40,7 +42,7 @@ export default function DishDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { isFavorite, toggleFavorite } = useFavorites();
-    const [copied, setCopied] = useState(false);
+    const toast = useToast();
     // 本地版本号，详情补全后触发重渲染（dish 存在 registry 里，非 state）
     const [, forceRender] = useState(0);
     const [detailLoading, setDetailLoading] = useState(false);
@@ -122,19 +124,15 @@ export default function DishDetail() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={async () => {
-                            try {
-                                await navigator.clipboard.writeText(
-                                    dishToText(dish),
-                                );
-                                setCopied(true);
-                                setTimeout(() => setCopied(false), 1500);
-                            } catch {
-                                // 忽略
-                            }
+                            const ok = await copyText(dishToText(dish));
+                            toast(
+                                ok ? "做法已复制" : "复制失败，请长按手动复制",
+                                ok ? "success" : "error",
+                            );
                         }}
                         className="text-sm px-3 py-1.5 rounded-full bg-white text-gray-500 shadow-sm"
                     >
-                        {copied ? "已复制" : "复制做法"}
+                        复制做法
                     </button>
                     <button
                         onClick={() => toggleFavorite(dish)}

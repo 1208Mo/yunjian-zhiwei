@@ -1,8 +1,11 @@
 // 开饭卡：可一键复制分享的成果卡片。
 import { aggregateShopping } from "../utils/menu.js";
+import { copyText } from "../utils/clipboard.js";
+import { useToast } from "../store/toast.jsx";
 
 export default function KaiFanCard({ menu, serves }) {
     const dishes = menu.dishes;
+    const toast = useToast();
     const today = new Date().toLocaleDateString("zh-CN", {
         month: "long",
         day: "numeric",
@@ -27,7 +30,7 @@ export default function KaiFanCard({ menu, serves }) {
 
     const shopping = aggregateShopping(dishes);
 
-    const handleShare = () => {
+    const handleShare = async () => {
         const lines = [
             `🍽️ 开饭卡 · ${today}`,
             "",
@@ -41,11 +44,8 @@ export default function KaiFanCard({ menu, serves }) {
             shopping.forEach((i) => lines.push(`· ${i.name} ${i.amount}${i.unit}`));
         }
         const text = lines.join("\n");
-
-        if (navigator.clipboard) {
-            navigator.clipboard.writeText(text);
-            alert("开饭卡文案已复制，去分享吧～");
-        }
+        const ok = await copyText(text);
+        toast(ok ? "开饭卡已复制，去分享吧" : "复制失败，请长按手动复制", ok ? "success" : "error");
     };
 
     return (

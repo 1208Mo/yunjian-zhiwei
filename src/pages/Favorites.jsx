@@ -1,36 +1,30 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFavorites } from "../store/favorites.jsx";
 import { dishToText } from "../utils/menu.js";
+import { copyText } from "../utils/clipboard.js";
+import { useToast } from "../store/toast.jsx";
 import DishCard from "../components/DishCard.jsx";
 
 // 收藏夹页：查看 / 管理已保存的菜谱。数据来自 localStorage 持久化。
 export default function Favorites() {
     const navigate = useNavigate();
     const { favorites } = useFavorites();
-    const [copiedId, setCopiedId] = useState(null);
+    const toast = useToast();
 
     const copyDish = async (dish) => {
-        try {
-            await navigator.clipboard.writeText(dishToText(dish));
-            setCopiedId(dish.id);
-            setTimeout(() => setCopiedId(null), 1500);
-        } catch {
-            // 复制失败静默
-        }
+        const ok = await copyText(dishToText(dish));
+        toast(ok ? "做法已复制" : "复制失败，请长按手动复制", ok ? "success" : "error");
     };
 
     const copyAll = async () => {
-        try {
-            const text = favorites
-                .map((d) => dishToText(d))
-                .join("\n\n— — — — —\n\n");
-            await navigator.clipboard.writeText(text);
-            setCopiedId("all");
-            setTimeout(() => setCopiedId(null), 1500);
-        } catch {
-            // 忽略
-        }
+        const text = favorites
+            .map((d) => dishToText(d))
+            .join("\n\n— — — — —\n\n");
+        const ok = await copyText(text);
+        toast(
+            ok ? `已复制 ${favorites.length} 道菜` : "复制失败，请长按手动复制",
+            ok ? "success" : "error",
+        );
     };
 
     return (
@@ -51,7 +45,7 @@ export default function Favorites() {
                         onClick={copyAll}
                         className="shrink-0 text-sm text-brand font-medium px-3 py-1.5 rounded-lg bg-brand-50 active:bg-brand-100"
                     >
-                        {copiedId === "all" ? "已复制" : "复制全部"}
+                        {"复制全部"}
                     </button>
                 )}
             </header>
@@ -79,7 +73,7 @@ export default function Favorites() {
                                 onClick={() => copyDish(d)}
                                 className="absolute top-3 right-3 text-xs px-2.5 py-1 rounded-lg bg-white border border-ink-200 text-ink-500 active:bg-ink-50"
                             >
-                                {copiedId === d.id ? "已复制" : "复制做法"}
+                                {"复制做法"}
                             </button>
                         </div>
                     ))}

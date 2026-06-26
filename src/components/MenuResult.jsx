@@ -3,10 +3,13 @@ import SectionTitle from "./SectionTitle.jsx";
 import DishCard from "./DishCard.jsx";
 import KaiFanCard from "./KaiFanCard.jsx";
 import { registerDishes } from "../utils/dishRegistry.js";
+import { copyText } from "../utils/clipboard.js";
+import { useToast } from "../store/toast.jsx";
 
 // 单套菜单的完整展示：菜品列表 + 采购清单（带用量）+ 开饭卡。
 export default function MenuResult({ menu, serves }) {
     const dishes = menu.dishes;
+    const toast = useToast();
 
     // 登记菜品，供详情页按 id 取用
     useEffect(() => {
@@ -82,20 +85,14 @@ export default function MenuResult({ menu, serves }) {
     };
 
     // 复制采购清单为纯文本（未买的在前，已买的打勾在后）
-    const [copied, setCopied] = useState(false);
     const copyList = async () => {
         const lines = [`🛒 采购清单（${menu.label}）`];
         shoppingList.forEach((i) => {
             const mark = checked.has(itemKey(i)) ? "✅" : "▢";
             lines.push(`${mark} ${i.name} ${i.amount}${i.unit}`);
         });
-        try {
-            await navigator.clipboard.writeText(lines.join("\n"));
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch {
-            // 复制失败静默
-        }
+        const ok = await copyText(lines.join("\n"));
+        toast(ok ? "采购清单已复制" : "复制失败，请长按手动复制", ok ? "success" : "error");
     };
 
     return (
@@ -135,7 +132,7 @@ export default function MenuResult({ menu, serves }) {
                             onClick={copyList}
                             className="text-xs text-brand font-medium px-2.5 py-1 rounded-md bg-orange-50 active:bg-orange-100"
                         >
-                            {copied ? "已复制" : "复制清单"}
+                            {"复制清单"}
                         </button>
                     </div>
                 </div>

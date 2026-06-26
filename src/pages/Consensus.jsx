@@ -4,6 +4,7 @@ import { RECIPES } from "../data/recipes.js";
 import { normalizeDish } from "../utils/menu.js";
 import { streamAiPick, createRoom, fetchRoom } from "../api/client.js";
 import { registerDishes } from "../utils/dishRegistry.js";
+import { copyText } from "../utils/clipboard.js";
 import { usePickResult } from "../store/pickResult.jsx";
 import ProgressLoader from "../components/ProgressLoader.jsx";
 import Chip from "../components/Chip.jsx";
@@ -123,11 +124,11 @@ export default function Consensus() {
     }, [meals]);
 
     const copyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl);
+        const ok = await copyText(shareUrl);
+        if (ok) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
-        } catch {
+        } else {
             setShareErr("复制失败，请手动长按链接复制");
         }
     };
